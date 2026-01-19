@@ -55,3 +55,10 @@ fly.toml
 
 # Models - exclude from GitHub (download from Hugging Face)
 models/
+
+# Documentation - exclude from GitHub
+开题报告.md
+LOCAL_DEPLOYMENT_GUIDE.md
+DEPLOYMENT_GUIDE.md
+FLY_DEPLOYMENT_GUIDE.md
+DOCKER_GUIDE.md
