@@ -10,7 +10,7 @@ class VectorField(models.Field):
         super().__init__(*args, **kwargs)
     
     def db_type(self, connection):
-        return f'vector({self.dimension})'
+        return 'vector(%s)' % self.dimension
 
 
 class Embedding(BaseModel):
