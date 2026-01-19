@@ -160,18 +160,20 @@ npm run dev
 ## API接口
 
 ### 知识库管理
-- `POST /api/knowledge/upload/` - 上传文档
-- `GET /api/knowledge/document/` - 查询文档列表
-- `POST /api/knowledge/search/` - 向量搜索
+- `POST /knowledge/upload/` - 上传文档
+- `GET /knowledge/document/` - 查询文档列表
+- `POST /knowledge/search/` - 向量搜索
 
 ### 聊天对话
-- `POST /api/chat/stream/` - 流式对话
-- `GET /api/chat/session/` - 查询会话列表
-- `GET /api/chat/message/` - 查询消息列表
+- `POST /chat/stream/` - 流式对话
+- `GET /chat/session/` - 查询会话列表
+- `GET /chat/message/` - 查询消息列表
 
 ### 模型管理
-- `GET /api/model_provider/config/` - 查询模型配置
-- `POST /api/model_provider/config/` - 创建模型配置
+- `GET /model/config/` - 查询模型配置
+- `POST /model/config/` - 创建模型配置
+- `GET /model/providers/` - 查询模型提供商列表
+- `GET /model/types/` - 查询模型类型列表
 
 ## 数据库设计
 
