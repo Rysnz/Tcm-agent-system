@@ -38,7 +38,6 @@ INSTALLED_APPS = [
     'apps.tools',
     'apps.model_provider',
     'apps.users',
-    'apps.system_manage',
     'apps.common',
 ]
 
