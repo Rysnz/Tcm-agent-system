@@ -51,28 +51,14 @@ TCM Agent System 是一个结合传统中医理论与现代人工智能技术的
 
 ### 部署方式
 
-项目支持多种部署方式，请根据实际需求选择：
+项目根目录包含部署脚本和配置文件：
 
-1. **本地开发部署**：直接运行开发服务器
-   ```bash
-   # 后端
-   python manage.py runserver
-   
-   # 前端
-   cd ui
-   npm run dev
-   ```
+- `start_all.bat` - 一键启动所有服务
+- `start_backend.bat` - 启动后端
+- `start_frontend.bat` - 启动前端  
+- `docker-compose.yml` - Docker容器化部署
 
-2. **生产环境部署**：根据实际需求选择
-   - 使用Gunicorn + Nginx部署
-   - 使用Docker容器化部署
-   - 部署到云平台（Fly.io、Render、Railway等）
-   
-   详细的部署配置请参考项目根目录的部署脚本：
-   - `start_all.bat` - 一键启动所有服务
-   - `start_backend.bat` - 启动后端
-   - `start_frontend.bat` - 启动前端
-   - `docker-compose.yml` - Docker容器化部署
+根据实际需求选择合适的部署方式。
 
 ## 项目结构
 
