@@ -1,0 +1,75 @@
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.viewsets import ModelViewSet
+from apps.chat.models import ChatSession, ChatMessage
+from apps.chat.serializers import ChatSessionSerializer, ChatMessageSerializer
+from apps.application.models import Application
+from rest_framework.pagination import PageNumberPagination
+import uuid
+
+
+class ChatMessagePagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class ChatSessionViewSet(ModelViewSet):
+    queryset = ChatSession.objects.filter(is_delete=False)
+    serializer_class = ChatSessionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ChatSession.objects.filter(is_delete=False)
+
+    def retrieve(self, request, *args, **kwargs):
+        kwargs['pk'] = self._get_session_id(kwargs['pk'])
+        return super().retrieve(request, *args, **kwargs)
+
+    def _get_session_id(self, pk):
+        if pk == 'default':
+            # 创建或获取默认会话
+            session, created = ChatSession.objects.get_or_create(
+                user_id=request.user.id,
+                application_id=request.query_params.get('application_id'),
+                is_default=True,
+                is_delete=False
+            )
+            return str(session.id)
+        try:
+            return uuid.UUID(pk)
+        except ValueError:
+            return pk
+
+
+class ChatMessageViewSet(ModelViewSet):
+    queryset = ChatMessage.objects.filter(is_delete=False)
+    serializer_class = ChatMessageSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = ChatMessagePagination
+
+    def get_queryset(self):
+        return ChatMessage.objects.filter(is_delete=False)
+
+
+class ChatAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            # 简化的响应生成，直接返回固定消息
+            assistant_message = "您好，我是中医智能问诊助手。请问有什么可以帮助您的吗？"
+            response_data = {
+                "answer": assistant_message,
+                "session_id": request.data.get("session_id", "default"),
+                "message_id": str(uuid.uuid4())
+            }
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                "error": str(e),
+                "message": "聊天请求处理失败"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
