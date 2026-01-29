@@ -173,13 +173,6 @@ npm run dev
 - `tcm_application` - 应用
 - `tcm_model_config` - 模型配置
 
-## 部署指南
-
-详细的部署指南请参考项目文档：
-- 本地部署：systemd服务管理
-- Docker部署：Docker Compose配置
-- 云平台部署：Fly.io、Render、Railway
-
 ## 开发指南
 
 ### 代码规范
