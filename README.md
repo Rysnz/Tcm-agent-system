@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue.svg)
 ![Django](https://img.shields.io/badge/Django-5.2.9-green.svg)
-![React](https://img.shields.io/badge/React-18-blue.svg)
+![Vue](https://img.shields.io/badge/Vue-3.5-green.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
@@ -37,17 +37,23 @@ TCM Agent System 是一个结合传统中医理论与现代人工智能技术的
 ## 技术架构
 
 ### 后端技术栈
-- **框架**：Django 5.2.9
+- **框架**：Django 5.2.9 + Django REST Framework 3.15.2
 - **语言**：Python 3.11
 - **数据库**：PostgreSQL 16 + pgvector
 - **向量模型**：SentenceTransformer (shibing624/text2vec-base-chinese, 768维)
+- **LLM框架**：LangChain + LangGraph
+- **任务队列**：Celery + Redis
+- **生产服务器**：Gunicorn
 
 ### 前端技术栈
-- **框架**：React 18 + Vue 3
-- **构建工具**：Vite 5
+- **框架**：Vue 3.5
+- **构建工具**：Vite 6
 - **UI组件**：Element Plus
 - **状态管理**：Pinia
 - **HTTP客户端**：Axios
+- **路由**：Vue Router 4
+- **图表库**：ECharts
+- **类型支持**：TypeScript
 
 ### 部署方式
 
@@ -221,8 +227,8 @@ chore: 构建/工具相关
 
 - **项目名称**：TCM Agent System - 基于大语言模型的中医智能问诊系统
 - **开发语言**：Python 3.11
-- **后端框架**：Django 5.2.9
-- **前端框架**：React 18 + Vite 5
+- **后端框架**：Django 5.2.9 + Django REST Framework
+- **前端框架**：Vue 3.5 + Vite 6
 - **数据库**：PostgreSQL 16 + pgvector
 - **向量模型**：SentenceTransformer (768维)
 - **开发周期**：2025年1月 - 2026年1月
