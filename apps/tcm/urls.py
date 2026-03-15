@@ -8,4 +8,6 @@ urlpatterns = [
     path('api/knowledge/', include('apps.knowledge.urls')),
     path('api/chat/', include('apps.chat.urls')),
     path('api/model/', include('apps.model_provider.urls')),
+    # v2: 多智能体问诊 API
+    path('api/v2/consult/', include('apps.agents.urls')),
 ]

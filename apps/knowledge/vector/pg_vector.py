@@ -344,35 +344,64 @@ class PGVectorStore(BaseVectorStore):
         
         return search_results
     
-    def blend_search(self, query: str, k: int = 4, filter: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-        """混合搜索，结合向量搜索和关键词搜索"""
+    def blend_search(self, query: str, k: int = 4, filter: Dict[str, Any] = None,
+                     rrf_k: int = 60) -> List[Dict[str, Any]]:
+        """
+        混合搜索，使用 RRF（Reciprocal Rank Fusion）融合向量搜索和关键词搜索结果。
+
+        RRF 公式：score(d) = Σ 1 / (k + rank(d))
+        其中 k=60 是经典 RRF 超参数，rank(d) 是文档在各子系统中的排名（从1开始）。
+        """
         import logging
         logger = logging.getLogger('apps')
-        
-        logger.info(f"混合搜索: {query}")
-        
-        # 执行两种搜索
+
+        logger.info(f"RRF 混合搜索: {query}")
+
+        # 执行两种搜索（取 2*k 个候选）
         embedding_results = self.embedding_search(query, k * 2, filter)
         keywords_results = self.keywords_search(query, k * 2, filter)
-        
-        # 合并结果，去重
-        result_map = {}
-        for result in embedding_results:
-            result_map[result['id']] = result
-        
-        for result in keywords_results:
-            if result['id'] in result_map:
-                # 混合得分：向量得分 * 0.6 + 关键词得分 * 0.4
-                result_map[result['id']]['score'] = result_map[result['id']]['score'] * 0.6 + result['score'] * 0.4
-                result_map[result['id']]['search_type'] = 'blend'
-            else:
-                result_map[result['id']] = result
-        
-        # 转换为列表并排序
-        all_results = list(result_map.values())
-        all_results.sort(key=lambda x: x['score'], reverse=True)
-        
-        return all_results[:k]
+
+        # 构建排名映射
+        embedding_rank: Dict[str, int] = {
+            r['id']: idx + 1 for idx, r in enumerate(embedding_results)
+        }
+        keywords_rank: Dict[str, int] = {
+            r['id']: idx + 1 for idx, r in enumerate(keywords_results)
+        }
+
+        # 合并所有候选文档
+        all_ids = set(embedding_rank.keys()) | set(keywords_rank.keys())
+
+        # 构建文档内容映射
+        doc_map: Dict[str, Dict] = {}
+        for r in embedding_results:
+            doc_map[r['id']] = r
+        for r in keywords_results:
+            if r['id'] not in doc_map:
+                doc_map[r['id']] = r
+
+        # 计算 RRF 分数
+        rrf_scores: Dict[str, float] = {}
+        for doc_id in all_ids:
+            rrf_score = 0.0
+            if doc_id in embedding_rank:
+                rrf_score += 1.0 / (rrf_k + embedding_rank[doc_id])
+            if doc_id in keywords_rank:
+                rrf_score += 1.0 / (rrf_k + keywords_rank[doc_id])
+            rrf_scores[doc_id] = rrf_score
+
+        # 按 RRF 分数排序
+        sorted_ids = sorted(all_ids, key=lambda did: rrf_scores[did], reverse=True)
+
+        results = []
+        for doc_id in sorted_ids[:k]:
+            doc = doc_map[doc_id].copy()
+            doc['score'] = rrf_scores[doc_id]
+            doc['search_type'] = 'blend_rrf'
+            results.append(doc)
+
+        logger.info(f"RRF 混合搜索返回 {len(results)} 条结果")
+        return results
     
     def similarity_search_with_score(self, query: str, k: int = 4, filter: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """
