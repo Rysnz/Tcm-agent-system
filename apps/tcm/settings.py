@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'apps.model_provider',
     'apps.users',
     'apps.common',
+    'apps.agents',
 ]
 
 MIDDLEWARE = [
