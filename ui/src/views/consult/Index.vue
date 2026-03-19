@@ -244,9 +244,19 @@ import { consultApi } from '@/api'
 import dayjs from 'dayjs'
 
 // Minimal markdown renderer (no external dep needed beyond what's installed)
+const escapeHtml = (raw: string): string =>
+  raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+
 const renderMarkdown = (text: string): string => {
   if (!text) return ''
-  return text
+  // Sanitize HTML first, then apply safe markdown transformations
+  const safe = escapeHtml(text)
+  return safe
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/`(.*?)`/g, '<code>$1</code>')

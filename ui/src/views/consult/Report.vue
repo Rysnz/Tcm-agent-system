@@ -222,9 +222,19 @@ const references = computed(() => report.value?.report_json?.references || repor
 const safetyInfo = computed(() => report.value?.report_json?.safety || report.value?.safety || null)
 const reportText = computed(() => report.value?.report_text || '')
 
+const escapeHtml = (raw: string): string =>
+  raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+
 const renderMarkdown = (text: string): string => {
   if (!text) return ''
-  return text
+  // Sanitize HTML first, then apply safe markdown transformations
+  const safe = escapeHtml(text)
+  return safe
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/\n/g, '<br/>')
