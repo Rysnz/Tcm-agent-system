@@ -62,3 +62,9 @@ LOCAL_DEPLOYMENT_GUIDE.md
 DEPLOYMENT_GUIDE.md
 FLY_DEPLOYMENT_GUIDE.md
 DOCKER_GUIDE.md
+
+# Frontend
+ui/node_modules/
+ui/dist/
+ui/.vite/
+

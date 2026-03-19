@@ -305,6 +305,125 @@ export const chatApi = {
   }
 }
 
+// ============================================================
+// 多智能体问诊 API（v2）
+// ============================================================
+
+export interface ConsultSession {
+  session_id: string
+  trace_id: string
+  stage: string
+  message?: string
+  disclaimer?: string
+}
+
+export interface ConsultMessageResponse {
+  session_id: string
+  trace_id: string
+  stage: string
+  is_high_risk: boolean
+  assistant_message: string
+  pending_questions: string[]
+  primary_syndrome: string | null
+  agent_steps: Array<{ agent: string; stage: string; success: boolean; retry_count: number }>
+  report?: ConsultReport | null
+}
+
+export interface ConsultReport {
+  text?: string
+  json?: Record<string, any>
+  syndrome_candidates?: Array<{ name: string; confidence: number; supporting_symptoms: string[] }>
+  recommendations?: Array<{ category: string; content: string; rationale: string; caution?: string }>
+  references?: Array<{ content: string; source: string; score: number }>
+  safety?: {
+    risk_level: string
+    should_refer_immediately: boolean
+    safety_message?: string
+    special_population_flags: string[]
+  }
+  disclaimer?: string
+}
+
+export interface ObservationResult {
+  session_id: string
+  observation: {
+    tongue_color?: string
+    tongue_coating?: string
+    coating_thickness?: string
+    coating_texture?: string
+    tongue_shape?: string
+    face_color?: string
+    image_features: string[]
+  }
+}
+
+export interface WellnessPlan {
+  constitution: string
+  start_date: string
+  end_date: string
+  theme: string
+  key_principles: string[]
+  daily_plans: Array<{
+    date: string
+    sleep_advice: string
+    morning_routine: string
+    diet_breakfast: string
+    diet_lunch: string
+    diet_dinner: string
+    exercise: string
+    emotion_adjustment: string
+    acupoint_care?: string
+    tea_recommendation?: string
+    checklist: string[]
+  }>
+  weekly_notes: string
+}
+
+export const consultApi = {
+  /** 创建新问诊会话 */
+  createSession: (): Promise<ConsultSession> =>
+    request.post('/v2/consult/session/', {}),
+
+  /** 发送消息，推进问诊流程 */
+  sendMessage: (sessionId: string, message: string): Promise<ConsultMessageResponse> =>
+    request.post('/v2/consult/message/', { session_id: sessionId, message }),
+
+  /** 上传舌象图片 */
+  uploadTongueImage: (sessionId: string, file: File): Promise<ObservationResult> => {
+    const formData = new FormData()
+    formData.append('session_id', sessionId)
+    formData.append('image', file)
+    return request.post('/v2/consult/image/', formData)
+  },
+
+  /** 获取会话状态 */
+  getSession: (sessionId: string) =>
+    request.get(`/v2/consult/session/${sessionId}/`),
+
+  /** 获取问诊报告 */
+  getReport: (sessionId: string): Promise<{ session_id: string; report_text: string; report_json: any; disclaimer: string }> =>
+    request.get(`/v2/consult/session/${sessionId}/report/`),
+
+  /** 获取支持的体质列表 */
+  getConstitutions: (): Promise<{ constitutions: string[] }> =>
+    request.get('/v2/consult/wellness/constitutions/'),
+
+  /** 生成养生计划 */
+  generateWellnessPlan: (constitution: string, cycle_days: number = 7, feedback?: Record<string, any>): Promise<{ plan: WellnessPlan }> =>
+    request.post('/v2/consult/wellness/plan/', { constitution, cycle_days, feedback }),
+
+  /** 提交养生打卡 */
+  wellnessCheckin: (data: {
+    date: string
+    constitution: string
+    completed_items: string[]
+    energy_level: number
+    sleep_quality: number
+    mood_score: number
+    notes?: string
+  }) => request.post('/v2/consult/wellness/checkin/', data),
+}
+
 export const toolsApi = {
   getTools: async () => {
     try {

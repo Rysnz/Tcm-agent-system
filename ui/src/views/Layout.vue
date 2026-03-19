@@ -1,8 +1,8 @@
 <template>
   <el-container class="layout-container">
     <el-header class="topbar">
-      <div class="logo">
-        <h2>中医智能问诊</h2>
+      <div class="logo" @click="$router.push('/home')" style="cursor:pointer;">
+        <h2>🌿 中医智能问诊</h2>
       </div>
       <el-menu
         :default-active="$route.path"
@@ -11,22 +11,46 @@
         mode="horizontal"
         :ellipsis="false"
       >
-        <el-menu-item index="/overview">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>概览</span>
+        <!-- 主要功能 -->
+        <el-menu-item index="/home">
+          <el-icon><House /></el-icon>
+          <span>首页</span>
         </el-menu-item>
-        <el-menu-item index="/application">
-          <el-icon><Management /></el-icon>
-          <span>设置</span>
+        <el-menu-item index="/consult">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>智能问诊</span>
         </el-menu-item>
-        <el-menu-item index="/knowledge">
-          <el-icon><Document /></el-icon>
-          <span>知识库</span>
+        <el-menu-item index="/consult/tongue">
+          <el-icon><View /></el-icon>
+          <span>舌象分析</span>
         </el-menu-item>
-        <el-menu-item index="/model">
-          <el-icon><Cpu /></el-icon>
-          <span>模型管理</span>
+        <el-menu-item index="/wellness">
+          <el-icon><Sunny /></el-icon>
+          <span>养生管理</span>
         </el-menu-item>
+        <!-- 后台管理分组 -->
+        <el-sub-menu index="/admin" class="admin-menu">
+          <template #title>
+            <el-icon><Setting /></el-icon>
+            <span>后台管理</span>
+          </template>
+          <el-menu-item index="/overview">
+            <el-icon><DataAnalysis /></el-icon>
+            概览
+          </el-menu-item>
+          <el-menu-item index="/application">
+            <el-icon><Management /></el-icon>
+            应用设置
+          </el-menu-item>
+          <el-menu-item index="/knowledge">
+            <el-icon><Document /></el-icon>
+            知识库
+          </el-menu-item>
+          <el-menu-item index="/model">
+            <el-icon><Cpu /></el-icon>
+            模型管理
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-header>
     <el-main class="main-content">
@@ -36,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { DataAnalysis, Management, Document, Cpu } from '@element-plus/icons-vue'
+import { DataAnalysis, Management, Document, Cpu, House, ChatDotRound, View, Sunny, Setting } from '@element-plus/icons-vue'
 </script>
 
 <style scoped>
@@ -47,14 +71,15 @@ import { DataAnalysis, Management, Document, Cpu } from '@element-plus/icons-vue
 }
 
 .topbar {
-  background: linear-gradient(135deg, #1e3a8a 0%, #2c3e50 100%);
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   padding: 0 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   gap: 24px;
+  height: 60px;
 }
 
 .logo {
@@ -64,54 +89,74 @@ import { DataAnalysis, Management, Document, Cpu } from '@element-plus/icons-vue
   gap: 12px;
   font-size: 18px;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .logo h2 {
   margin: 0;
-  background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
+  background: linear-gradient(135deg, #fff 0%, #a8c8ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   color: transparent;
   letter-spacing: 1px;
+  white-space: nowrap;
 }
 
 .topbar-menu {
   border: none;
   background-color: transparent;
   color: #fff;
-  gap: 8px;
+  gap: 4px;
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: rgba(255,255,255,0.75);
+  --el-menu-active-color: #fff;
+  --el-menu-hover-bg-color: rgba(255,255,255,0.1);
+  --el-menu-border-color: transparent;
 }
 
-.topbar-menu .el-menu-item {
-  color: #c0c4cc;
+.topbar-menu :deep(.el-menu-item) {
   height: 60px;
   line-height: 60px;
   border-bottom: 3px solid transparent;
-  margin: 0;
-  padding: 0 16px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
+  padding: 0 14px;
+  border-radius: 6px 6px 0 0;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  color: rgba(255,255,255,0.75);
+}
+
+.topbar-menu :deep(.el-menu-item:hover) {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff;
+}
+
+.topbar-menu :deep(.el-menu-item.is-active) {
+  background: rgba(64, 158, 255, 0.2) !important;
+  color: #fff;
+  border-bottom-color: #409eff;
+}
+
+.topbar-menu :deep(.el-sub-menu__title) {
+  height: 60px;
+  line-height: 60px;
+  color: rgba(255,255,255,0.75);
+  border-bottom: 3px solid transparent;
+  padding: 0 14px;
+  border-radius: 6px 6px 0 0;
   font-weight: 500;
 }
 
-.topbar-menu .el-menu-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+.topbar-menu :deep(.el-sub-menu__title:hover) {
+  background: rgba(255, 255, 255, 0.1) !important;
   color: #fff;
-  transform: translateY(-2px);
-}
-
-.topbar-menu .el-menu-item.is-active {
-  background: rgba(64, 158, 255, 0.15);
-  color: #fff;
-  border-bottom-color: transparent;
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
 }
 
 .main-content {
-  background-color: #f0f2f5;
-  padding: 20px;
+  background-color: #f5f7fb;
+  padding: 0;
   flex: 1;
   overflow: auto;
 }
 </style>
+
