@@ -38,10 +38,6 @@
             <el-icon><DataAnalysis /></el-icon>
             概览
           </el-menu-item>
-          <el-menu-item index="/application">
-            <el-icon><Management /></el-icon>
-            应用设置
-          </el-menu-item>
           <el-menu-item index="/knowledge">
             <el-icon><Document /></el-icon>
             知识库
@@ -60,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { DataAnalysis, Management, Document, Cpu, House, ChatDotRound, View, Sunny, Setting } from '@element-plus/icons-vue'
+import { DataAnalysis, Document, Cpu, House, ChatDotRound, View, Sunny, Setting } from '@element-plus/icons-vue'
 </script>
 
 <style scoped>

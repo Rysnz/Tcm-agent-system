@@ -9,12 +9,6 @@ const router = createRouter({
       name: 'Login',
       component: () => import('@/views/Login.vue')
     },
-    // 旧版聊天（保留兼容）
-    {
-      path: '/chat',
-      name: 'Chat',
-      component: () => import('@/views/chat/Index.vue')
-    },
     {
       path: '/',
       component: Layout,
@@ -56,11 +50,6 @@ const router = createRouter({
           path: 'overview',
           name: 'Overview',
           component: () => import('@/views/Overview.vue')
-        },
-        {
-          path: 'application',
-          name: 'Application',
-          component: () => import('@/views/application/Setting.vue')
         },
         {
           path: 'model',

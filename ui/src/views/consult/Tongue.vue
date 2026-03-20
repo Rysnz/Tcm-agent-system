@@ -58,26 +58,20 @@
               </div>
             </el-upload>
 
-            <!-- 会话绑定 -->
-            <div class="session-bind" v-if="!sessionId">
+            <!-- 独立分析提示 -->
+            <div class="session-bind">
               <el-alert
-                title="当前无活动问诊会话"
+                title="独立舌象分析模式"
                 type="info"
                 :closable="false"
-                description="舌象分析结果将记录到指定会话中，您也可以先开始问诊再上传。"
+                description="舌象分析结果将单独呈现。您也可以输入问诊会话ID，将分析结果关联到对应问诊记录。"
               />
               <el-input
                 v-model="manualSessionId"
-                placeholder="输入问诊会话ID（选填）"
+                placeholder="关联问诊会话ID（选填，留空则独立分析）"
                 class="mt-12"
                 clearable
               />
-            </div>
-            <div v-else class="session-tag">
-              <el-tag type="success">
-                <el-icon><Link /></el-icon>
-                已绑定会话：{{ sessionId }}
-              </el-tag>
             </div>
 
             <el-button
@@ -141,17 +135,25 @@
                 :closable="false"
                 class="mt-16"
                 title="分析完成"
-                description="舌象信息已记录到问诊会话，系统将在辨证时综合考虑这些信息。"
+                description="舌象特征信息已提取完成。如已绑定问诊会话，系统将在辨证时综合考虑这些信息。"
               />
 
-              <el-button
-                type="primary"
-                class="mt-16"
-                style="width: 100%;"
-                @click="goToConsult"
-              >
-                返回继续问诊
-              </el-button>
+              <div class="result-actions mt-16">
+                <el-button
+                  v-if="manualSessionId || sessionId"
+                  type="primary"
+                  style="flex:1;"
+                  @click="goToConsult"
+                >
+                  前往问诊
+                </el-button>
+                <el-button
+                  style="flex:1;"
+                  @click="resetAnalysis"
+                >
+                  重新分析
+                </el-button>
+              </div>
             </div>
           </el-card>
         </el-col>
@@ -177,12 +179,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import {
-  ArrowLeft, View, Upload, Delete, Search, Picture,
-  Link, Flag, Reading
+import { ArrowLeft, View, Upload, Delete, Search, Picture,
+  Flag, Reading
 } from '@element-plus/icons-vue'
 import { consultApi, type ObservationResult } from '@/api'
 
@@ -262,11 +263,7 @@ const handleFileChange = (file: any) => {
 const analyzeImage = async () => {
   if (!selectedFile.value) return
 
-  const targetSessionId = sessionId.value || manualSessionId.value
-  if (!targetSessionId) {
-    ElMessage.warning('请先前往问诊页面开始一次问诊，或手动输入会话ID')
-    return
-  }
+  const targetSessionId = sessionId.value || manualSessionId.value || ''
 
   analyzing.value = true
   try {
@@ -278,6 +275,12 @@ const analyzeImage = async () => {
   } finally {
     analyzing.value = false
   }
+}
+
+const resetAnalysis = () => {
+  result.value = null
+  previewUrl.value = ''
+  selectedFile.value = null
 }
 
 const goToConsult = () => {
@@ -384,6 +387,8 @@ $primary: #1677ff;
 
   .session-bind { margin-top: 16px; }
   .session-tag { margin-top: 12px; }
+
+    .result-actions { display: flex; gap: 8px; }
 
   .analyze-btn {
     width: 100%;

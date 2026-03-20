@@ -302,6 +302,8 @@ const agentSteps = ref<AgentStep[]>([])
 const sessionHistory = ref<SessionHistoryItem[]>([])
 
 const STORAGE_KEY = 'tcm_session_history'
+const MESSAGES_PREFIX = 'tcm_session_msgs_'
+const STAGE_PREFIX = 'tcm_session_stage_'
 
 const stageName = computed(() => {
   const map: Record<string, string> = {
@@ -358,6 +360,26 @@ const saveHistoryToStorage = () => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionHistory.value))
 }
 
+const saveMessagesToStorage = (sessionId: string) => {
+  localStorage.setItem(MESSAGES_PREFIX + sessionId, JSON.stringify(messages.value))
+  localStorage.setItem(STAGE_PREFIX + sessionId, currentStage.value)
+}
+
+const loadMessagesFromStorage = (sessionId: string): boolean => {
+  try {
+    const raw = localStorage.getItem(MESSAGES_PREFIX + sessionId)
+    const stage = localStorage.getItem(STAGE_PREFIX + sessionId)
+    if (raw) {
+      messages.value = JSON.parse(raw)
+      currentStage.value = stage || 'intake'
+      return true
+    }
+  } catch {
+    /* ignore */
+  }
+  return false
+}
+
 const addToHistory = (sessionId: string, firstMsg: string) => {
   const existing = sessionHistory.value.findIndex(s => s.session_id === sessionId)
   const item: SessionHistoryItem = {
@@ -391,6 +413,7 @@ const startNewSession = async () => {
         content: res.message,
         time: dayjs().format('HH:mm'),
       })
+      saveMessagesToStorage(currentSessionId.value)
       await scrollToBottom()
     }
   } catch (err) {
@@ -400,12 +423,18 @@ const startNewSession = async () => {
 }
 
 const loadSession = (sessionId: string) => {
-  // For simplicity we restart from scratch; in a production app you'd reload messages
   currentSessionId.value = sessionId
-  messages.value = []
   agentSteps.value = []
-  currentStage.value = 'intake'
-  ElMessage.info('历史会话恢复功能正在建设中，已切换会话ID')
+  inputText.value = ''
+  const restored = loadMessagesFromStorage(sessionId)
+  if (!restored) {
+    messages.value = []
+    currentStage.value = 'intake'
+    ElMessage.info('未找到该会话的本地记录，已切换到该会话ID')
+  } else {
+    ElMessage.success('历史会话已恢复')
+    nextTick(() => scrollToBottom())
+  }
 }
 
 const handleSend = async () => {
@@ -453,6 +482,7 @@ const handleSend = async () => {
       references: refs,
     })
 
+    saveMessagesToStorage(currentSessionId.value)
     await scrollToBottom()
   } catch (err: any) {
     isThinking.value = false

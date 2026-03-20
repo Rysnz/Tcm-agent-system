@@ -79,6 +79,44 @@
             </el-row>
           </div>
         </el-tab-pane>
+        <!-- Agent配置 -->
+        <el-tab-pane label="Agent配置" name="agent-config">
+          <div class="agent-config-container">
+            <el-alert
+              type="info"
+              :closable="false"
+              title="Agent模型分配"
+              description="为每个智能体独立指定调用的模型。未指定时，系统将使用全局默认模型。配置保存在本地浏览器中。"
+              class="mb-16"
+            />
+            <el-table :data="agentConfigList" border>
+              <el-table-column prop="label" label="智能体" width="180" />
+              <el-table-column prop="desc" label="职责说明" />
+              <el-table-column label="分配的模型" width="260">
+                <template #default="{ row }">
+                  <el-select
+                    v-model="agentModelMap[row.name]"
+                    placeholder="使用全局默认"
+                    clearable
+                    style="width: 100%;"
+                    @change="saveAgentConfig"
+                  >
+                    <el-option
+                      v-for="m in modelList"
+                      :key="m.id"
+                      :label="m.name"
+                      :value="m.id"
+                    />
+                  </el-select>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="agent-config-tip">
+              <el-icon><InfoFilled /></el-icon>
+              Agent模型配置仅在本地浏览器中生效，后端默认从已激活模型中选取。如需后端生效，请在后端配置文件中指定各Agent所用模型ID。
+            </div>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </el-card>
     
@@ -192,7 +230,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, ElForm } from 'element-plus'
-import { Plus, More, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, More, Edit, Delete, InfoFilled } from '@element-plus/icons-vue'
 import { modelApi, type ModelConfig } from '@/api'
 
 // 定义类型
@@ -238,6 +276,33 @@ interface ParamField {
   max?: number
   step?: number
   options?: Array<{label: string; value: any}>
+}
+
+// Agent 配置数据
+const AGENT_CONFIG_KEY = 'tcm_agent_model_config'
+
+const agentConfigList = [
+  { name: 'IntakeAgent',          label: '接诊分诊 Agent',   desc: '收集主诉、病程、伴随症状及既往史' },
+  { name: 'InquiryAgent',         label: '追问引导 Agent',   desc: '按"十问"策略动态追问以补全信息' },
+  { name: 'ObservationAgent',     label: '望诊融合 Agent',   desc: '分析舌象/面色图片，提取视觉诊断特征' },
+  { name: 'SyndromeAgent',        label: '辨证分型 Agent',   desc: '综合症状输出候选证型与置信度' },
+  { name: 'RecommendationAgent',  label: '调理建议 Agent',   desc: '生成饮食/作息/情志/穴位等个性化建议' },
+  { name: 'SafetyGuardAgent',     label: '安全审查 Agent',   desc: '识别高危症状并拦截不当建议' },
+  { name: 'ReportAgent',          label: '报告生成 Agent',   desc: '汇总生成结构化问诊报告' },
+]
+
+const agentModelMap = reactive<Record<string, string>>({})
+
+const loadAgentConfig = () => {
+  try {
+    const raw = localStorage.getItem(AGENT_CONFIG_KEY)
+    if (raw) Object.assign(agentModelMap, JSON.parse(raw))
+  } catch { /* ignore */ }
+}
+
+const saveAgentConfig = () => {
+  localStorage.setItem(AGENT_CONFIG_KEY, JSON.stringify({ ...agentModelMap }))
+  ElMessage.success('Agent配置已保存（本地）')
 }
 
 // 页面状态
@@ -520,6 +585,7 @@ onMounted(() => {
   loadModelList()
   loadProviders()
   loadModelTypes()
+  loadAgentConfig()
 })
 </script>
 
@@ -623,4 +689,20 @@ onMounted(() => {
   font-size: 14px;
   color: #606266;
 }
+
+.agent-config-container {
+  padding: 20px;
+}
+
+.agent-config-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+}
+
+.mb-16 { margin-bottom: 16px; }
 </style>
