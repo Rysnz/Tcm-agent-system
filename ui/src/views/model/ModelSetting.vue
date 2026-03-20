@@ -86,7 +86,7 @@
               type="info"
               :closable="false"
               title="Agent模型分配"
-              description="为每个智能体独立指定调用的模型。未指定时，系统将使用全局默认模型。配置保存在本地浏览器中。"
+              description="为每个智能体独立指定调用的模型。未指定时，系统将优先使用已激活的默认模型。配置保存在服务端，立即生效。"
               class="mb-16"
             />
             <el-table :data="agentConfigList" border>
@@ -99,7 +99,6 @@
                     placeholder="使用全局默认"
                     clearable
                     style="width: 100%;"
-                    @change="saveAgentConfig"
                   >
                     <el-option
                       v-for="m in modelList"
@@ -111,9 +110,10 @@
                 </template>
               </el-table-column>
             </el-table>
-            <div class="agent-config-tip">
-              <el-icon><InfoFilled /></el-icon>
-              Agent模型配置仅在本地浏览器中生效，后端默认从已激活模型中选取。如需后端生效，请在后端配置文件中指定各Agent所用模型ID。
+            <div style="margin-top: 16px;">
+              <el-button type="primary" @click="saveAgentConfig" :loading="agentConfigSaving">
+                保存Agent配置
+              </el-button>
             </div>
           </div>
         </el-tab-pane>
@@ -230,7 +230,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, ElForm } from 'element-plus'
-import { Plus, More, Edit, Delete, InfoFilled } from '@element-plus/icons-vue'
+import { Plus, More, Edit, Delete } from '@element-plus/icons-vue'
 import { modelApi, type ModelConfig } from '@/api'
 
 // 定义类型
@@ -292,17 +292,39 @@ const agentConfigList = [
 ]
 
 const agentModelMap = reactive<Record<string, string>>({})
+const agentConfigSaving = ref(false)
 
-const loadAgentConfig = () => {
+const loadAgentConfig = async () => {
   try {
-    const raw = localStorage.getItem(AGENT_CONFIG_KEY)
-    if (raw) Object.assign(agentModelMap, JSON.parse(raw))
-  } catch { /* ignore */ }
+    const data = await modelApi.getAgentConfig()
+    Object.keys(agentModelMap).forEach(k => { delete agentModelMap[k] })
+    Object.assign(agentModelMap, data)
+  } catch {
+    // 网络失败时尝试读取本地缓存（降级）
+    try {
+      const raw = localStorage.getItem(AGENT_CONFIG_KEY)
+      if (raw) Object.assign(agentModelMap, JSON.parse(raw))
+    } catch { /* ignore */ }
+  }
 }
 
-const saveAgentConfig = () => {
-  localStorage.setItem(AGENT_CONFIG_KEY, JSON.stringify({ ...agentModelMap }))
-  ElMessage.success('Agent配置已保存（本地）')
+const saveAgentConfig = async () => {
+  agentConfigSaving.value = true
+  try {
+    // 将空字符串转换为 null，表示清除分配
+    const payload: Record<string, string | null> = {}
+    agentConfigList.forEach(({ name }) => {
+      payload[name] = agentModelMap[name] || null
+    })
+    await modelApi.saveAgentConfig(payload)
+    // 同步写入本地缓存（离线降级用）
+    localStorage.setItem(AGENT_CONFIG_KEY, JSON.stringify({ ...agentModelMap }))
+    ElMessage.success('Agent配置已保存并在后端生效')
+  } catch {
+    ElMessage.error('保存失败，请确认已登录')
+  } finally {
+    agentConfigSaving.value = false
+  }
 }
 
 // 页面状态
@@ -692,16 +714,6 @@ onMounted(() => {
 
 .agent-config-container {
   padding: 20px;
-}
-
-.agent-config-tip {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin-top: 16px;
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.6;
 }
 
 .mb-16 { margin-bottom: 16px; }

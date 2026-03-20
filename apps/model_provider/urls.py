@@ -4,7 +4,8 @@ from rest_framework.routers import DefaultRouter
 from apps.model_provider.views import (
     ModelConfigViewSet, ModelProviderView,
     ModelTypeView, ModelListView,
-    ModelCredentialView, ModelParamsFormView
+    ModelCredentialView, ModelParamsFormView,
+    AgentModelConfigView,
 )
 
 # 创建默认路由
@@ -15,7 +16,10 @@ router.register(r'model-config', ModelConfigViewSet, basename='model-config')
 urlpatterns = [
     # 模型配置相关路由
     path('', include(router.urls)),
-    
+
+    # Agent模型分配
+    path('agent-config/', AgentModelConfigView.as_view(), name='agent-model-config'),
+
     # 模型提供商相关路由
     path('providers/', ModelProviderView.as_view(), name='model-providers'),
     path('model-types/', ModelTypeView.as_view(), name='model-types'),

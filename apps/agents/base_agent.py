@@ -189,17 +189,71 @@ class BaseAgent(ABC):
         max_tokens: int,
         **kwargs,
     ) -> str:
-        """通过 Django settings 中配置的 LLM 进行调用（OpenAI 兼容接口）。"""
+        """通过数据库中配置的 LLM 进行调用（OpenAI 兼容接口）。
+
+        优先使用为当前 Agent 显式分配的模型配置；若未指定则退回到已激活的模型，
+        最后再退回到 Django settings 中的全局 LLM 设置。
+        """
         from django.conf import settings
 
-        api_key = getattr(settings, "LLM_API_KEY", "")
-        base_url = getattr(settings, "LLM_BASE_URL", "https://api.openai.com/v1")
-        model = getattr(settings, "LLM_MODEL", "gpt-3.5-turbo")
+        api_key = None
+        base_url = None
+        model = None
+
+        # 1) 尝试从数据库中查找当前 Agent 的专属模型配置
+        try:
+            from apps.model_provider.models import AgentModelConfig, ModelConfig
+            agent_cfg = (
+                AgentModelConfig.objects
+                .select_related('model_config')
+                .filter(agent_name=self.agent_name, model_config__isnull=False)
+                .first()
+            )
+            if agent_cfg and agent_cfg.model_config:
+                mc = agent_cfg.model_config
+                cred = mc.credential or {}
+                api_key = cred.get('api_key') or cred.get('openai_api_key')
+                base_url = cred.get('base_url') or cred.get('openai_base_url')
+                model = mc.model_name
+                logger.debug(
+                    "[%s] Using agent-specific model: %s (id=%s)",
+                    self.agent_name, model, mc.id,
+                )
+        except Exception as exc:
+            logger.warning("[%s] Failed to load agent model config from DB: %s", self.agent_name, exc)
+
+        # 2) 退回到已激活的第一个 LLM 模型配置
+        if not api_key:
+            try:
+                from apps.model_provider.models import ModelConfig
+                active_mc = ModelConfig.objects.filter(
+                    is_active=True, is_delete=False, model_type='LLM'
+                ).first()
+                if active_mc:
+                    cred = active_mc.credential or {}
+                    api_key = cred.get('api_key') or cred.get('openai_api_key')
+                    base_url = cred.get('base_url') or cred.get('openai_base_url')
+                    model = active_mc.model_name
+                    logger.debug(
+                        "[%s] Using active model: %s (id=%s)",
+                        self.agent_name, model, active_mc.id,
+                    )
+            except Exception as exc:
+                logger.warning("[%s] Failed to load active model config from DB: %s", self.agent_name, exc)
+
+        # 3) 最终退回到 Django settings 中的全局配置
+        if not api_key:
+            api_key = getattr(settings, "LLM_API_KEY", "")
+            base_url = base_url or getattr(settings, "LLM_BASE_URL", "https://api.openai.com/v1")
+            model = model or getattr(settings, "LLM_MODEL", "gpt-3.5-turbo")
 
         if not api_key:
             raise RuntimeError(
-                "LLM_API_KEY 未配置。请在 .env 文件中设置 LLM_API_KEY。"
+                "LLM_API_KEY 未配置。请在模型管理页面添加并激活模型，"
+                "或在 .env 文件中设置 LLM_API_KEY。"
             )
+
+        base_url = base_url or "https://api.openai.com/v1"
 
         from openai import OpenAI  # type: ignore
         client = OpenAI(api_key=api_key, base_url=base_url)
@@ -220,13 +274,47 @@ class BaseAgent(ABC):
         """流式 LLM 调用（SSE 场景使用）。"""
         from django.conf import settings
 
-        api_key = getattr(settings, "LLM_API_KEY", "")
-        base_url = getattr(settings, "LLM_BASE_URL", "https://api.openai.com/v1")
-        model = getattr(settings, "LLM_MODEL", "gpt-3.5-turbo")
+        api_key = None
+        base_url = None
+        model = None
+
+        # 优先使用 Agent 专属或已激活的数据库模型配置
+        try:
+            from apps.model_provider.models import AgentModelConfig, ModelConfig
+            agent_cfg = (
+                AgentModelConfig.objects
+                .select_related('model_config')
+                .filter(agent_name=self.agent_name, model_config__isnull=False)
+                .first()
+            )
+            if agent_cfg and agent_cfg.model_config:
+                mc = agent_cfg.model_config
+                cred = mc.credential or {}
+                api_key = cred.get('api_key') or cred.get('openai_api_key')
+                base_url = cred.get('base_url') or cred.get('openai_base_url')
+                model = mc.model_name
+            else:
+                active_mc = ModelConfig.objects.filter(
+                    is_active=True, is_delete=False, model_type='LLM'
+                ).first()
+                if active_mc:
+                    cred = active_mc.credential or {}
+                    api_key = cred.get('api_key') or cred.get('openai_api_key')
+                    base_url = cred.get('base_url') or cred.get('openai_base_url')
+                    model = active_mc.model_name
+        except Exception as exc:
+            logger.warning("[%s] stream: failed to load model config from DB: %s", self.agent_name, exc)
+
+        if not api_key:
+            api_key = getattr(settings, "LLM_API_KEY", "")
+            base_url = base_url or getattr(settings, "LLM_BASE_URL", "https://api.openai.com/v1")
+            model = model or getattr(settings, "LLM_MODEL", "gpt-3.5-turbo")
 
         if not api_key:
             yield "[ERROR] LLM_API_KEY 未配置"
             return
+
+        base_url = base_url or "https://api.openai.com/v1"
 
         from openai import OpenAI  # type: ignore
         client = OpenAI(api_key=api_key, base_url=base_url)

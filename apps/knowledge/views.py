@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from apps.knowledge.models import KnowledgeBase, Document
@@ -13,6 +14,7 @@ logger = logging.getLogger('apps')
 class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     queryset = KnowledgeBase.objects.filter(is_delete=False)
     serializer_class = KnowledgeBaseSerializer
+    permission_classes = [IsAuthenticated]
     
     def perform_create(self, serializer):
         serializer.save(user_id=self.request.user.id)
@@ -77,6 +79,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.filter(is_delete=False)
     serializer_class = DocumentSerializer
+    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -151,6 +154,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return Response({'message': 'Document embedding deleted successfully'})
 
 class DocumentUploadView(APIView):
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
         """
@@ -317,6 +321,7 @@ class DocumentUploadView(APIView):
             )
 
 class KnowledgeSearchView(APIView):
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
         """
@@ -371,6 +376,7 @@ class EmbeddingOperationView(APIView):
     """
     向量操作接口
     """
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
         """

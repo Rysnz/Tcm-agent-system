@@ -729,7 +729,7 @@ $bg-main: #f5f7fb;
     align-items: flex-start;
     gap: 12px;
 
-    &.user { flex-direction: row-reverse; }
+    &.user { justify-content: flex-end; }
 
     .avatar {
       width: 40px;

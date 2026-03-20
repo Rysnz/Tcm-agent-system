@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Sum
@@ -10,6 +11,7 @@ from apps.application.flow.workflow_manage import WorkflowManager
 class ApplicationViewSet(viewsets.ModelViewSet):
     queryset = Application.objects.filter(is_delete=False)
     serializer_class = ApplicationSerializer
+    permission_classes = [IsAuthenticated]
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -121,6 +123,7 @@ class ApplicationViewSet(viewsets.ModelViewSet):
         return Response(result)
 
 class WorkflowExecuteView(APIView):
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
         application_id = request.data.get('application_id')
@@ -138,6 +141,7 @@ class WorkflowExecuteView(APIView):
         return Response(result)
 
 class WorkflowValidateView(APIView):
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
         application_id = request.data.get('application_id')
@@ -154,6 +158,7 @@ class WorkflowValidateView(APIView):
         return Response(validation_result)
 
 class WorkflowSaveView(APIView):
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
         import json
@@ -194,6 +199,7 @@ class WorkflowSaveView(APIView):
 
 class ApplicationStatsView(APIView):
     """获取应用统计数据"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request):
         """

@@ -1,9 +1,10 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.model_provider.models import ModelConfig
+from apps.model_provider.models import AgentModelConfig, ModelConfig
 from apps.model_provider.serializers import (
     ModelConfigSerializer, ProviderInfoSerializer,
     ModelTypeSerializer, ModelListSerializer
@@ -15,7 +16,7 @@ class ModelConfigViewSet(viewsets.ModelViewSet):
     """模型配置视图集"""
     queryset = ModelConfig.objects.filter(is_delete=False)
     serializer_class = ModelConfigSerializer
-    permission_classes = []
+    permission_classes = [IsAuthenticated]
     
     def perform_create(self, serializer):
         """创建模型配置时的处理"""
@@ -34,8 +35,49 @@ class ModelConfigViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+class AgentModelConfigView(APIView):
+    """Agent模型配置视图——为每个智能体指定独立模型"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """获取当前各Agent的模型分配（返回 {agent_name: model_config_id}）"""
+        configs = AgentModelConfig.objects.select_related('model_config').all()
+        result = {
+            cfg.agent_name: cfg.model_config_id
+            for cfg in configs
+            if cfg.model_config_id is not None
+        }
+        return Response(result)
+
+    def put(self, request):
+        """批量更新Agent模型分配（接受 {agent_name: model_config_id | null}）"""
+        data = request.data
+        if not isinstance(data, dict):
+            return Response({'error': '请求体必须是 JSON 对象'}, status=status.HTTP_400_BAD_REQUEST)
+
+        for agent_name, model_config_id in data.items():
+            if model_config_id:
+                try:
+                    mc = ModelConfig.objects.get(id=model_config_id, is_delete=False)
+                except ModelConfig.DoesNotExist:
+                    return Response(
+                        {'error': f'模型配置 {model_config_id} 不存在'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                AgentModelConfig.objects.update_or_create(
+                    agent_name=agent_name,
+                    defaults={'model_config': mc},
+                )
+            else:
+                # null 表示清除该 agent 的模型分配
+                AgentModelConfig.objects.filter(agent_name=agent_name).update(model_config=None)
+
+        return Response({'status': 'ok'})
+
+
 class ModelProviderView(APIView):
     """模型提供商视图"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request):
         """获取所有模型提供商信息"""
@@ -46,6 +88,7 @@ class ModelProviderView(APIView):
 
 class ModelTypeView(APIView):
     """模型类型视图"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request):
         """获取所有模型类型"""
@@ -56,6 +99,7 @@ class ModelTypeView(APIView):
 
 class ModelListView(APIView):
     """模型列表视图"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request):
         """根据提供商和模型类型获取模型列表"""
@@ -80,6 +124,7 @@ class ModelListView(APIView):
 
 class ModelCredentialView(APIView):
     """模型认证视图"""
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
         """验证模型认证信息"""
@@ -112,6 +157,7 @@ class ModelCredentialView(APIView):
 
 class ModelParamsFormView(APIView):
     """模型参数表单视图"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request):
         """获取模型参数设置表单"""

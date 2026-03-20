@@ -608,5 +608,20 @@ export const modelApi = {
       console.error('删除模型失败:', error)
       throw error
     }
-  }
+  },
+
+  // 获取 Agent 模型分配（后端持久化）
+  getAgentConfig: async (): Promise<Record<string, string | null>> => {
+    try {
+      return await request.get('/model/agent-config/')
+    } catch (error) {
+      console.error('获取Agent配置失败:', error)
+      return {}
+    }
+  },
+
+  // 保存 Agent 模型分配（后端持久化）
+  saveAgentConfig: async (config: Record<string, string | null>) => {
+    return await request.put('/model/agent-config/', config)
+  },
 }

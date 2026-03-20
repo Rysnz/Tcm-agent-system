@@ -48,10 +48,15 @@ _INQUIRY_SYSTEM_PROMPT = build_system_prompt(
     """你是一名专业的中医问诊助手，擅长通过"十问"策略系统地收集患者信息。
 
 你的任务：
-1. 根据已知症状和已有答案，判断哪些维度还需要追问。
-2. 生成最多2个最相关的追问问题（简洁、口语化、一次不超过2问）。
-3. 如果信息已经充足（已覆盖至少5个维度或症状明确），返回 is_sufficient=true。
-4. 如果用户的回答包含新症状信息，提取出来。
+1. 仔细阅读完整对话记录，从中提取用户已经回答的十问维度，填入 inquiry_answers。
+2. 根据已知症状和已回答的维度，判断哪些维度还需要追问。
+3. 生成最多2个最相关的追问问题（简洁、口语化，一次不超过2问）。
+4. 如果信息已经充足（已覆盖至少5个维度或症状明确），返回 is_sufficient=true。
+
+重要提示：
+- 务必从对话历史中提取已回答的所有维度（不要只看最新一条消息）。
+- 如果用户回答了某个问题，务必在 inquiry_answers 中记录，避免重复追问同一维度。
+- 对话记录中助手的问题对应哪个十问维度，请做出对应映射。
 
 以 JSON 格式返回：
 {
@@ -78,13 +83,21 @@ class InquiryAgent(BaseAgent):
     def _execute(self, state: SessionState, **kwargs) -> SessionState:
         new_state = state.model_copy(deep=True)
 
-        # 如果已有待回答的问题，先解析用户的回答
-        user_reply = self._get_latest_user_message(new_state)
-
         # 构建 LLM 输入
         context_summary = new_state.to_context_summary()
         already_answered = ", ".join(new_state.inquiry_answers.keys()) or "无"
         symptoms_str = ", ".join(s.name for s in new_state.symptoms) or "未明确"
+
+        # 包含最近10条对话记录，帮助 LLM 识别已回答的维度
+        recent_messages = new_state.messages[-10:]
+        history_lines = []
+        for msg in recent_messages:
+            role_label = "患者" if msg.get("role") == "user" else "助手"
+            history_lines.append(f"{role_label}：{msg.get('content', '')}")
+        history_text = "\n".join(history_lines) if history_lines else "（暂无对话记录）"
+
+        # 已向患者提出但尚未记录答案的问题
+        pending_str = "\n".join(new_state.pending_questions) if new_state.pending_questions else "无"
 
         messages = [
             {"role": "system", "content": _INQUIRY_SYSTEM_PROMPT},
@@ -93,9 +106,12 @@ class InquiryAgent(BaseAgent):
                 "content": (
                     f"当前问诊上下文：\n{context_summary}\n\n"
                     f"已收集症状：{symptoms_str}\n"
-                    f"已覆盖的十问维度：{already_answered}\n"
-                    f"用户最新回答：{user_reply or '（首次进入问诊）'}\n\n"
-                    "请判断下一步如何追问，并以 JSON 格式返回。"
+                    f"已覆盖的十问维度（已记录）：{already_answered}\n"
+                    f"上次助手提出的问题（请从对话中提取答案）：\n{pending_str}\n\n"
+                    f"=== 完整对话记录（最近10条）===\n{history_text}\n"
+                    "=====================================\n\n"
+                    "请根据以上对话记录，提取患者已回答的维度，并判断下一步如何追问，"
+                    "以 JSON 格式返回。"
                 ),
             },
         ]
@@ -126,12 +142,6 @@ class InquiryAgent(BaseAgent):
     # 内部辅助
     # ------------------------------------------------------------------
 
-    def _get_latest_user_message(self, state: SessionState) -> str:
-        for msg in reversed(state.messages):
-            if msg.get("role") == "user":
-                return msg.get("content", "")
-        return ""
-
     def _update_state(self, state: SessionState, data: Dict[str, Any]) -> SessionState:
         if not data:
             return state
@@ -148,9 +158,14 @@ class InquiryAgent(BaseAgent):
                     )
                 )
 
-        # 更新十问答案
+        # 更新十问答案（优先使用详细的 inquiry_answers）
         for k, v in data.get("inquiry_answers", {}).items():
             state.inquiry_answers[k] = v
+
+        # 用 answered_dimensions 补充标记已回答的维度（防止 inquiry_answers 漏记）
+        for dim in data.get("answered_dimensions", []):
+            if dim and dim not in state.inquiry_answers:
+                state.inquiry_answers[dim] = "已回答"
 
         # 设置待追问问题
         questions: List[str] = data.get("questions", [])

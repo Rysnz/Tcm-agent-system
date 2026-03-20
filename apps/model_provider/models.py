@@ -30,3 +30,25 @@ class ModelConfig(models.Model):
     
     def __str__(self):
         return f'{self.name}({self.model_name})'
+
+
+class AgentModelConfig(models.Model):
+    """Agent模型分配配置——为每个智能体指定独立的模型"""
+    agent_name = models.CharField(
+        max_length=100, unique=True, verbose_name='Agent名称',
+        help_text='如：IntakeAgent、InquiryAgent'
+    )
+    model_config = models.ForeignKey(
+        ModelConfig, null=True, blank=True,
+        on_delete=models.SET_NULL,
+        verbose_name='分配的模型配置',
+        related_name='agent_assignments'
+    )
+    update_time = models.DateTimeField(verbose_name='更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Agent模型配置'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return f'{self.agent_name} → {self.model_config}'
