@@ -49,13 +49,22 @@
             <el-tag type="primary" size="large" effect="plain">
               {{ currentPlan.constitution }}
             </el-tag>
+            <el-tag
+              v-if="currentPlan.generated_by === 'TCM-Agent-LLM'"
+              type="success"
+              size="small"
+              effect="plain"
+              style="margin-left:6px;"
+            >
+              🤖 AI个性化
+            </el-tag>
             <div class="summary-dates">
               <el-icon><Calendar /></el-icon>
               {{ currentPlan.start_date }} ~ {{ currentPlan.end_date }}
             </div>
           </div>
           <div class="summary-theme">
-            <div class="theme-label">本周主题</div>
+            <div class="theme-label">本期主题</div>
             <div class="theme-text">{{ currentPlan.theme }}</div>
           </div>
         </div>
@@ -284,13 +293,11 @@ const generatePlan = async () => {
   }
   generating.value = true
   try {
-    const feedback = planForm.value.syndrome
-      ? { syndrome: planForm.value.syndrome }
-      : undefined
     const res = await consultApi.generateWellnessPlan(
       planForm.value.constitution,
       planForm.value.cycle_days,
-      feedback,
+      undefined,
+      planForm.value.syndrome || undefined,
     )
     currentPlan.value = res.plan
     if (res.plan.daily_plans.length) {
@@ -298,9 +305,16 @@ const generatePlan = async () => {
     }
     savePlanToStorage(res.plan)
     dialogVisible.value = false
-    ElMessage.success('养生计划已生成！')
+    const generated = res.plan.generated_by === 'TCM-Agent-LLM' ? '（AI个性化生成）' : '（模板方案）'
+    ElMessage.success('养生计划已生成！' + generated)
   } catch (err: any) {
-    ElMessage.error('生成失败：' + (err?.response?.data?.error || err?.message || '未知错误'))
+    const rawMsg = err?.response?.data?.error || err?.message || '未知错误'
+    let userMsg = '生成失败：' + rawMsg
+    if (rawMsg.includes('LLM_API_KEY') || rawMsg.includes('未配置')) {
+      userMsg = '模型未配置：养生计划将使用内置模板方案。如需AI个性化计划，请在后台管理中配置并激活LLM模型。'
+      // Retry with template fallback already handled by backend, just try again
+    }
+    ElMessage.warning({ message: userMsg, duration: 5000, showClose: true })
   } finally {
     generating.value = false
   }

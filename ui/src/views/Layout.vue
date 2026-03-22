@@ -28,8 +28,8 @@
           <el-icon><Sunny /></el-icon>
           <span>养生管理</span>
         </el-menu-item>
-        <!-- 后台管理分组 -->
-        <el-sub-menu index="/admin" class="admin-menu">
+        <!-- 后台管理分组（仅登录后可见） -->
+        <el-sub-menu v-if="isLoggedIn" index="/admin" class="admin-menu">
           <template #title>
             <el-icon><Setting /></el-icon>
             <span>后台管理</span>
@@ -47,6 +47,11 @@
             模型管理
           </el-menu-item>
         </el-sub-menu>
+        <!-- 未登录时显示管理员入口 -->
+        <el-menu-item v-else index="/login" class="admin-login-btn">
+          <el-icon><Lock /></el-icon>
+          <span>管理员登录</span>
+        </el-menu-item>
       </el-menu>
     </el-header>
     <el-main class="main-content">
@@ -56,7 +61,12 @@
 </template>
 
 <script setup lang="ts">
-import { DataAnalysis, Document, Cpu, House, ChatDotRound, View, Sunny, Setting } from '@element-plus/icons-vue'
+import { computed } from 'vue'
+import { DataAnalysis, Document, Cpu, House, ChatDotRound, View, Sunny, Setting, Lock } from '@element-plus/icons-vue'
+import { isTokenValid } from '@/utils/token'
+
+// Reactive: recomputed whenever localStorage changes (e.g., after login/logout)
+const isLoggedIn = computed(() => isTokenValid())
 </script>
 
 <style scoped>
@@ -148,6 +158,14 @@ import { DataAnalysis, Document, Cpu, House, ChatDotRound, View, Sunny, Setting 
   color: #fff;
 }
 
+.admin-login-btn :deep(.el-menu-item) {
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 6px !important;
+  margin: 10px 4px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+}
+
 .main-content {
   background-color: #f5f7fb;
   padding: 0;
@@ -155,4 +173,3 @@ import { DataAnalysis, Document, Cpu, House, ChatDotRound, View, Sunny, Setting 
   overflow: auto;
 }
 </style>
-

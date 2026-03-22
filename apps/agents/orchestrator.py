@@ -139,10 +139,24 @@ class TCMOrchestrator:
         if image_bytes or image_path:
             state.has_image = True
 
-        # 3. 根据当前阶段路由
+        # 3. 根据当前阶段路由（记录用户消息前的助手消息数）
+        assistant_count_before = sum(1 for m in state.messages if m.get("role") == "assistant")
         state = self._route(state, image_bytes=image_bytes, image_path=image_path)
 
-        # 4. 持久化
+        # 4. 若本轮路由后阶段直接跳过了 INQUIRY（信息充足），继续执行直到产生助手回复或完成
+        #    这样用户不会看到空响应
+        max_extra = 6
+        extra = 0
+        while extra < max_extra:
+            new_assistant_count = sum(1 for m in state.messages if m.get("role") == "assistant")
+            has_new_msg = new_assistant_count > assistant_count_before
+            if has_new_msg or state.current_stage == ConsultStage.DONE:
+                break
+            # 还没有新助手消息，继续执行下一阶段
+            state = self._route(state, image_bytes=image_bytes, image_path=image_path)
+            extra += 1
+
+        # 5. 持久化
         self._persist(state)
 
         return state
@@ -262,6 +276,9 @@ class TCMOrchestrator:
             if state.is_high_risk:
                 state.current_stage = ConsultStage.REPORT
                 state = self.report_agent.run(state)
+            elif state.current_stage == ConsultStage.INQUIRY:
+                # INTAKE 不产生用户可见回复，立即执行首次 INQUIRY 追问
+                state = self._route(state)
 
         elif stage == ConsultStage.INQUIRY:
             inquiry_rounds = sum(

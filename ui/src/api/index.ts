@@ -377,6 +377,7 @@ export interface WellnessPlan {
     checklist: string[]
   }>
   weekly_notes: string
+  generated_by?: string
 }
 
 export const consultApi = {
@@ -409,8 +410,8 @@ export const consultApi = {
     request.get('/v2/consult/wellness/constitutions/'),
 
   /** 生成养生计划 */
-  generateWellnessPlan: (constitution: string, cycle_days: number = 7, feedback?: Record<string, any>): Promise<{ plan: WellnessPlan }> =>
-    request.post('/v2/consult/wellness/plan/', { constitution, cycle_days, feedback }),
+  generateWellnessPlan: (constitution: string, cycle_days: number = 7, feedback?: Record<string, any>, syndrome?: string): Promise<{ plan: WellnessPlan; summary_text?: string }> =>
+    request.post('/v2/consult/wellness/plan/', { constitution, cycle_days, feedback, syndrome }),
 
   /** 提交养生打卡 */
   wellnessCheckin: (data: {

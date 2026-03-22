@@ -32,7 +32,7 @@
       <div class="content-header">
         <div class="header-left">
           <el-tag type="info" size="small" effect="plain">
-            <el-icon><Stethoscope /></el-icon>
+            <el-icon><FirstAidKit /></el-icon>
             多智能体协同问诊
           </el-tag>
           <span class="stage-badge" :class="stageBadgeClass">
@@ -486,7 +486,14 @@ const handleSend = async () => {
     await scrollToBottom()
   } catch (err: any) {
     isThinking.value = false
-    ElMessage.error('发送失败：' + (err?.message || '未知错误'))
+    const rawMsg: string = err?.response?.data?.error || err?.message || '未知错误'
+    let userMsg = `发送失败：${rawMsg}`
+    if (rawMsg.includes('LLM_API_KEY') || rawMsg.includes('未配置')) {
+      userMsg = '模型未配置：请先在【后台管理 → 模型管理】中添加并激活 LLM 模型，或在后端 .env 文件中设置 LLM_API_KEY。'
+    } else if (rawMsg.includes('500') || rawMsg.includes('Internal Server Error')) {
+      userMsg = '服务器内部错误，请检查后端服务及模型配置是否正确。'
+    }
+    ElMessage.error({ message: userMsg, duration: 6000, showClose: true })
   } finally {
     isSending.value = false
   }

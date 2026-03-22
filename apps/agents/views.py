@@ -163,6 +163,11 @@ def send_message(request: Request) -> Response:
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+    # 记录处理前助手消息数量，以便找到本轮新增的助手回复
+    assistant_msg_count_before = sum(
+        1 for m in state.messages if m.get("role") == "assistant"
+    )
+
     # 处理消息
     orchestrator = _get_or_create_orchestrator()
     try:
@@ -174,11 +179,17 @@ def send_message(request: Request) -> Response:
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
-    # 提取最新的助手回复
-    assistant_messages = [
+    # 提取本轮新增的助手回复（优先取新增的；若无新增则取最新的）
+    all_assistant_messages = [
         m for m in state.messages if m.get("role") == "assistant"
     ]
-    latest_assistant_msg = assistant_messages[-1]["content"] if assistant_messages else ""
+    new_assistant_messages = all_assistant_messages[assistant_msg_count_before:]
+    if new_assistant_messages:
+        latest_assistant_msg = new_assistant_messages[-1]["content"]
+    elif all_assistant_messages:
+        latest_assistant_msg = all_assistant_messages[-1]["content"]
+    else:
+        latest_assistant_msg = ""
 
     # 构建响应
     response_data: Dict[str, Any] = {
@@ -586,11 +597,13 @@ def generate_wellness_plan(request: Request) -> Response:
             pass  # 忽略格式错误的打卡记录
 
     generator = WellnessPlanGenerator()
+    syndrome = request.data.get("syndrome") or None
     plan = generator.generate_weekly_plan(
         constitution=constitution,
         start_date=start_date,
         cycle_days=cycle_days,
         previous_feedback=previous_checkins if previous_checkins else None,
+        syndrome=syndrome,
     )
     summary = generator.generate_summary_text(plan)
 

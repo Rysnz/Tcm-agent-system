@@ -257,40 +257,194 @@ class WellnessPlanGenerator:
     """
     个性化养生计划生成器
 
-    基于体质类型和当前日期生成7天养生计划，
-    并支持基于用户反馈的下一周期微调。
+    优先使用 LLM 生成个性化计划；若模型未配置则退回到模板方案。
     """
+
+    def __init__(self):
+        self._llm_available: Optional[bool] = None  # None = 未检测
+
+    # ------------------------------------------------------------------
+    # LLM 调用辅助
+    # ------------------------------------------------------------------
+
+    def _call_llm(self, messages: list, temperature: float = 0.4, max_tokens: int = 2000) -> str:
+        """调用 LLM（复用 BaseAgent 的配置逻辑）"""
+        from django.conf import settings
+
+        api_key = None
+        base_url = None
+        model = None
+
+        try:
+            from apps.model_provider.models import ModelConfig
+            active_mc = ModelConfig.objects.filter(
+                is_active=True, is_delete=False, model_type='LLM'
+            ).first()
+            if active_mc:
+                cred = active_mc.credential or {}
+                api_key = cred.get('api_key') or cred.get('openai_api_key')
+                base_url = cred.get('base_url') or cred.get('openai_base_url')
+                model = active_mc.model_name
+        except Exception:
+            pass
+
+        if not api_key:
+            api_key = getattr(settings, 'LLM_API_KEY', '')
+            base_url = base_url or getattr(settings, 'LLM_BASE_URL', 'https://api.openai.com/v1')
+            model = model or getattr(settings, 'LLM_MODEL', 'gpt-3.5-turbo')
+
+        if not api_key:
+            raise RuntimeError('LLM_API_KEY 未配置')
+
+        import json as _json
+        from openai import OpenAI  # type: ignore
+        client = OpenAI(api_key=api_key, base_url=base_url or 'https://api.openai.com/v1')
+        resp = client.chat.completions.create(
+            model=model,
+            messages=messages,  # type: ignore[arg-type]
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return resp.choices[0].message.content or ''
+
+    def _parse_json(self, text: str) -> Optional[dict]:
+        import json as _json
+        text = text.strip()
+        if text.startswith('```'):
+            lines = [l for l in text.split('\n') if not l.strip().startswith('```')]
+            text = '\n'.join(lines).strip()
+        try:
+            return _json.loads(text)
+        except Exception:
+            start, end = text.find('{'), text.rfind('}')
+            if start != -1 and end > start:
+                try:
+                    return _json.loads(text[start:end + 1])
+                except Exception:
+                    pass
+        return None
+
+    def _generate_with_llm(
+        self,
+        constitution: str,
+        start_date: date,
+        cycle_days: int,
+        previous_feedback: Optional[List[CheckInRecord]],
+        syndrome: Optional[str] = None,
+    ) -> WeeklyWellnessPlan:
+        """使用 LLM 生成个性化养生计划"""
+        feedback_text = ''
+        if previous_feedback:
+            avg_energy = sum(r.energy_level for r in previous_feedback) / len(previous_feedback)
+            avg_sleep = sum(r.sleep_quality for r in previous_feedback) / len(previous_feedback)
+            avg_mood = sum(r.mood_score for r in previous_feedback) / len(previous_feedback)
+            feedback_text = (
+                f"上一周期用户反馈：平均精力 {avg_energy:.1f}/5，"
+                f"平均睡眠质量 {avg_sleep:.1f}/5，平均情绪 {avg_mood:.1f}/5。"
+            )
+
+        end_date = start_date + timedelta(days=cycle_days - 1)
+        date_list = [
+            (start_date + timedelta(days=i)).isoformat()
+            for i in range(cycle_days)
+        ]
+
+        system_prompt = (
+            '你是一名专业的中医养生调理师，擅长根据个人体质制定个性化养生方案。\n'
+            '请严格按照 JSON 格式输出，不要包含任何其他内容。\n\n'
+            '【安全约束】禁止输出明确的中药处方剂量，代茶饮只推荐日常保健性质的食材。'
+        )
+        syndrome_text = f'结合该用户的中医辨证结果（{syndrome}），' if syndrome else ''
+        user_prompt = (
+            f'请为{constitution}体质用户制定 {cycle_days} 天的个性化养生计划。\n'
+            f'{syndrome_text}计划日期：{start_date.isoformat()} 至 {end_date.isoformat()}\n'
+            f'{feedback_text}\n\n'
+            f'请以以下 JSON 格式返回（daily_plans 共 {cycle_days} 条，顺序对应日期列表 {date_list}）：\n'
+            '{\n'
+            '  "theme": "本期养生主题（一句话）",\n'
+            '  "key_principles": ["核心原则1", "核心原则2", "核心原则3"],\n'
+            '  "weekly_notes": "本周特别提示（3~5句）",\n'
+            '  "daily_plans": [\n'
+            '    {\n'
+            '      "date": "YYYY-MM-DD",\n'
+            '      "sleep_advice": "作息建议",\n'
+            '      "morning_routine": "晨起习惯",\n'
+            '      "diet_breakfast": "早餐建议",\n'
+            '      "diet_lunch": "午餐建议",\n'
+            '      "diet_dinner": "晚餐建议",\n'
+            '      "exercise": "运动方案",\n'
+            '      "emotion_adjustment": "情志调节",\n'
+            '      "acupoint_care": "穴位保健（如无则为null）",\n'
+            '      "tea_recommendation": "代茶饮（如无则为null）",\n'
+            '      "checklist": ["打卡项1", "打卡项2"]\n'
+            '    }\n'
+            '  ]\n'
+            '}\n'
+        )
+
+        messages = [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_prompt},
+        ]
+        raw = self._call_llm(messages, temperature=0.5, max_tokens=3000)
+        data = self._parse_json(raw)
+        if not data or 'daily_plans' not in data:
+            raise ValueError('LLM 返回的 JSON 格式无效')
+
+        daily_plans = []
+        for dp in data['daily_plans'][:cycle_days]:
+            daily_plans.append(DailyPlan(
+                date=dp.get('date', ''),
+                sleep_advice=dp.get('sleep_advice', '规律作息'),
+                morning_routine=dp.get('morning_routine', '晨起喝温水'),
+                diet_breakfast=dp.get('diet_breakfast', '清淡早餐'),
+                diet_lunch=dp.get('diet_lunch', '均衡午餐'),
+                diet_dinner=dp.get('diet_dinner', '清淡晚餐'),
+                exercise=dp.get('exercise', '适量运动'),
+                emotion_adjustment=dp.get('emotion_adjustment', '保持愉快'),
+                acupoint_care=dp.get('acupoint_care'),
+                tea_recommendation=dp.get('tea_recommendation'),
+                checklist=dp.get('checklist', []),
+            ))
+
+        return WeeklyWellnessPlan(
+            constitution=constitution,
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat(),
+            theme=data.get('theme', f'{constitution}养生计划'),
+            key_principles=data.get('key_principles', []),
+            daily_plans=daily_plans,
+            weekly_notes=data.get('weekly_notes', ''),
+            generated_by='TCM-Agent-LLM',
+        )
 
     def generate_weekly_plan(
         self,
+
         constitution: str,
         start_date: Optional[date] = None,
         cycle_days: int = 7,
         previous_feedback: Optional[List[CheckInRecord]] = None,
+        syndrome: Optional[str] = None,
     ) -> WeeklyWellnessPlan:
         """
-        生成周期养生计划
+        生成周期养生计划。
 
-        Parameters
-        ----------
-        constitution : str
-            体质类型（如"气虚质"）
-        start_date : date, optional
-            计划开始日期，默认为今天
-        cycle_days : int
-            计划天数，默认7天
-        previous_feedback : List[CheckInRecord], optional
-            上一周期的打卡反馈，用于微调本期计划
+        优先使用 LLM 生成个性化内容；若模型未配置则退回到模板方案。
         """
         if start_date is None:
             start_date = date.today()
 
-        plan_data = CONSTITUTION_PLANS.get(constitution, CONSTITUTION_PLANS["平和质"])
+        # 优先使用 LLM 生成个性化计划
+        try:
+            return self._generate_with_llm(constitution, start_date, cycle_days, previous_feedback, syndrome=syndrome)
+        except Exception as exc:
+            logger.info("LLM wellness plan generation failed (%s), falling back to template.", exc)
 
-        # 基于反馈微调计划
+        # 退回模板方案
+        plan_data = CONSTITUTION_PLANS.get(constitution, CONSTITUTION_PLANS["平和质"])
         adjustments = self._compute_adjustments(previous_feedback)
 
-        # 生成每日计划
         daily_plans = []
         for day_offset in range(cycle_days):
             current_date = start_date + timedelta(days=day_offset)
