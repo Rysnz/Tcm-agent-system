@@ -21,7 +21,7 @@ TCM Agent System 是一个专业级中医智能问诊系统，将单一 LLM Prom
 - 🎭 **多智能体编排**：7个专职 Agent 顺序协作，每步有独立 Pydantic Schema 和失败降级
 - 🔍 **可解释输出**：每条建议附证据链（症状 → 证型 → 知识来源）
 - 🛡️ **安全合规**：关键词拦截 + 特殊人群识别 + 禁止输出处方剂量
-- 📚 **RAG 增强**：RRF 混合检索（向量 + BM25）+ Rerank
+- 📚 **RAG 增强**：RRF 混合检索（向量 + BM25）
 - 🌿 **个性化养生**：基于九种体质的周期计划 + 打卡反馈微调
 - 🖼️ **望诊支持**：舌象图片上传 → 特征提取 → 融合辨证推理
 
@@ -56,13 +56,11 @@ flowchart TD
     API --> MultiAgentOrchestrator
 
     subgraph RAGSystem["📚 RAG 知识系统"]
-        VectorSearch["向量检索\nBGE Embeddings"]
+        VectorSearch["向量检索\nBGE-M3 Embeddings"]
         BM25Search["BM25 关键词检索"]
         RRFFusion["RRF 融合排序"]
-        Rerank["Rerank 精排"]
         VectorSearch --> RRFFusion
         BM25Search --> RRFFusion
-        RRFFusion --> Rerank
     end
 
     SYN -->|检索中医知识| RAGSystem
@@ -114,13 +112,13 @@ tcm-agent-system/
 │   │   ├── urls.py              # URL 路由
 │   │   └── tests.py             # 单元测试（28个测试用例）
 │   ├── knowledge/
-│   │   └── vector/pg_vector.py  # ✨ 升级：RRF 混合检索
-│   ├── chat/                    # 原有聊天模块（保留）
-│   ├── model_provider/          # 原有模型管理（保留）
+│   │   └── vector/pg_vector.py  # RRF 混合检索
+│   ├── application/             # 应用配置模块
+│   ├── model_provider/          # 模型管理
 │   └── tcm/
-│       ├── settings.py          # ✨ 新增 apps.agents 注册
-│       ├── urls.py              # ✨ 新增 /api/v2/consult/
-│       └── test_settings.py     # 🆕 测试专用配置（SQLite）
+│       ├── settings.py          # Django 配置
+│       ├── urls.py              # URL 路由
+│       └── test_settings.py     # 测试专用配置（SQLite）
 ├── ui/                          # 前端 Vue3+TS（原有，待完善）
 ├── .env.example                 # 🆕 完整配置示例
 ├── docker-compose.yml           # ✨ 升级：新增 Redis 服务
@@ -219,14 +217,6 @@ curl -X POST http://localhost:8000/api/v2/consult/wellness/plan/ \
 | POST | `/wellness/plan/` | 生成养生计划 |
 | POST | `/wellness/checkin/` | 养生打卡 |
 | GET  | `/wellness/constitutions/` | 九种体质说明 |
-
-### v1 原有 API（保留兼容）
-
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| POST | `/api/chat/` | 原有聊天接口 |
-| * | `/api/knowledge/` | 知识库管理 |
-| * | `/api/model/` | 模型配置 |
 
 ---
 
@@ -431,10 +421,11 @@ LLM_BASE_URL=http://localhost:11434/v1
 | `tcm_knowledge_base` | 知识库（中医经典/教材/证候库） |
 | `tcm_document` | 文档元数据 |
 | `tcm_paragraph` | 切分后的文本段落 |
-| `tcm_embedding` | 向量嵌入（768维） |
-| `tcm_chat_session` | 问诊会话 |
-| `tcm_chat_message` | 对话消息 |
-| `tcm_model_config` | LLM 配置 |
+| `tcm_embedding` | 向量嵌入（1024维） |
+| `agents_consultationsession` | 问诊会话状态 |
+| `agents_agentexecutionlog` | Agent执行日志 |
+| `model_provider_modelconfig` | LLM 配置 |
+| `model_provider_agentmodelconfig` | Agent模型绑定配置 |
 
 ---
 
