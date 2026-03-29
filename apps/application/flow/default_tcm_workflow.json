@@ -1,0 +1,144 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "data": {
+        "label": "开始",
+        "description": "中医问诊开始"
+      },
+      "position": { "x": 100, "y": 100 }
+    },
+    {
+      "id": "symptom_collection",
+      "type": "llm",
+      "data": {
+        "label": "症状采集",
+        "description": "收集用户症状信息",
+        "model_config": {
+          "model": "deepseek-chat",
+          "temperature": 0.7
+        },
+        "prompt_template": "你是一个专业的中医问诊助手。请根据用户的描述，提取关键症状信息。\n\n用户描述：{user_query}\n\n请提取以下信息：\n1. 主要症状\n2. 伴随症状\n3. 舌苔情况\n4. 脉象情况\n\n以JSON格式返回。"
+      },
+      "position": { "x": 300, "y": 100 }
+    },
+    {
+      "id": "diagnosis",
+      "type": "tool_call",
+      "data": {
+        "label": "辨证分析",
+        "description": "根据症状进行中医辨证",
+        "tool_name": "diagnosis",
+        "param_mapping": {
+          "symptoms": "extracted_symptoms"
+        }
+      },
+      "position": { "x": 500, "y": 100 }
+    },
+    {
+      "id": "knowledge_retrieval",
+      "type": "knowledge_retrieval",
+      "data": {
+        "label": "知识库检索",
+        "description": "从中医知识库检索相关信息",
+        "knowledge_base_id": "{knowledge_base_id}",
+        "top_k": 4
+      },
+      "position": { "x": 700, "y": 100 }
+    },
+    {
+      "id": "prescription",
+      "type": "tool_call",
+      "data": {
+        "label": "方剂推荐",
+        "description": "根据证型推荐方剂",
+        "tool_name": "prescription_search",
+        "param_mapping": {
+          "syndrome": "diagnosis_result.syndrome"
+        }
+      },
+      "position": { "x": 900, "y": 100 }
+    },
+    {
+      "id": "contraindication_check",
+      "type": "tool_call",
+      "data": {
+        "label": "配伍禁忌检查",
+        "description": "检查方剂中是否存在配伍禁忌",
+        "tool_name": "contraindication_check",
+        "param_mapping": {
+          "herbs": "prescription_result.prescriptions[0].herbs"
+        }
+      },
+      "position": { "x": 1100, "y": 100 }
+    },
+    {
+      "id": "final_response",
+      "type": "llm",
+      "data": {
+        "label": "生成最终回复",
+        "description": "综合所有信息生成问诊回复",
+        "model_config": {
+          "model": "deepseek-chat",
+          "temperature": 0.5
+        },
+        "prompt_template": "你是一个专业的中医医生。请根据以下信息生成问诊回复。\n\n用户症状：{user_query}\n\n辨证结果：{diagnosis_result}\n\n知识库信息：{retrieved_docs}\n\n推荐方剂：{prescription_result}\n\n配伍禁忌检查：{contraindication_result}\n\n请提供：\n1. 辨证分析\n2. 治则治法\n3. 推荐方剂及组成\n4. 用法用量\n5. 注意事项\n\n注意：如果存在配伍禁忌，必须明确指出并给出替代方案。"
+      },
+      "position": { "x": 1300, "y": 100 }
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "data": {
+        "label": "结束",
+        "description": "问诊结束"
+      },
+      "position": { "x": 1500, "y": 100 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start",
+      "target": "symptom_collection",
+      "data": {}
+    },
+    {
+      "id": "e2",
+      "source": "symptom_collection",
+      "target": "diagnosis",
+      "data": {}
+    },
+    {
+      "id": "e3",
+      "source": "diagnosis",
+      "target": "knowledge_retrieval",
+      "data": {}
+    },
+    {
+      "id": "e4",
+      "source": "knowledge_retrieval",
+      "target": "prescription",
+      "data": {}
+    },
+    {
+      "id": "e5",
+      "source": "prescription",
+      "target": "contraindication_check",
+      "data": {}
+    },
+    {
+      "id": "e6",
+      "source": "contraindication_check",
+      "target": "final_response",
+      "data": {}
+    },
+    {
+      "id": "e7",
+      "source": "final_response",
+      "target": "end",
+      "data": {}
+    }
+  ]
+}
