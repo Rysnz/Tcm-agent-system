@@ -37,9 +37,8 @@ _SYNDROME_SYSTEM_PROMPT = build_system_prompt(
 2. 辅助依据：RAG检索的中医知识
 3. 辨证方法：八纲辨证（阴阳、表里、寒热、虚实）为主
 
-【关于舌象和脉象】
+【关于舌象】
 - 舌象：如果系统提供了舌象分析结果，请作为重要参考依据
-- 脉象：本系统暂不采集脉象信息，请基于其他四诊信息进行辨证
 - 如果舌象信息不足，请基于症状和问诊信息进行辨证，不要要求补充脉象信息
 
 【辨证思路】
@@ -178,13 +177,14 @@ class SyndromeAgent(BaseAgent):
                     if symptom in content:
                         symptom_names.add(symptom)
         
-        # 打印调试信息
-        import sys
-        print(f"[DEBUG] SyndromeAgent Fallback extracted symptoms: {symptom_names}", file=sys.stderr)
-        print(f"[DEBUG] SyndromeAgent Fallback symptoms from state.symptoms: {[s.name for s in new_state.symptoms]}", file=sys.stderr)
-        print(f"[DEBUG] SyndromeAgent Fallback inquiry_answers: {new_state.inquiry_answers}", file=sys.stderr)
-        print(f"[DEBUG] SyndromeAgent Fallback chief_complaint: {new_state.chief_complaint}", file=sys.stderr)
-        print(f"[DEBUG] SyndromeAgent Fallback messages: {[m.get('content', '')[:50] for m in new_state.messages if m.get('role') == 'user']}", file=sys.stderr)
+        logger.debug(
+            "Syndrome fallback extracted symptoms=%s state_symptoms=%s inquiry_answers=%s chief_complaint=%s user_messages=%s",
+            symptom_names,
+            [s.name for s in new_state.symptoms],
+            new_state.inquiry_answers,
+            new_state.chief_complaint,
+            [m.get("content", "")[:50] for m in new_state.messages if m.get("role") == "user"],
+        )
         
         candidates: List[SyndromeCandidate] = []
 
@@ -309,7 +309,11 @@ class SyndromeAgent(BaseAgent):
             candidates.sort(key=lambda c: c.confidence, reverse=True)
             new_state.syndrome_candidates = candidates
             new_state.primary_syndrome = candidates[0].name
-            print(f"[DEBUG] SyndromeAgent Fallback syndrome: {candidates[0].name}, confidence: {candidates[0].confidence:.2f}", file=sys.stderr)
+            logger.debug(
+                "Syndrome fallback selected syndrome=%s confidence=%.2f",
+                candidates[0].name,
+                candidates[0].confidence,
+            )
         else:
             new_state.add_message(
                 "assistant",
@@ -382,7 +386,9 @@ class SyndromeAgent(BaseAgent):
             from apps.knowledge.models import KnowledgeBase
             from apps.knowledge.vector.pg_vector import PGVectorStore
             
-            query = state.chief_complaint or " ".join(s.name for s in state.symptoms[:3])
+            query_parts = [state.chief_complaint]
+            query_parts.extend(s.name for s in state.symptoms[:5])
+            query = " ".join(dict.fromkeys(part for part in query_parts if part and part.strip()))
             if not query.strip():
                 return []
 
@@ -415,7 +421,7 @@ class SyndromeAgent(BaseAgent):
                                     content=r.get("content", ""),
                                     source=r.get("source", f"知识库:{kb.name}"),
                                     score=r.get("score", 0.0),
-                                    chunk_id=r.get("id"),
+                                    chunk_id=str(r.get("id") or ""),
                                 )
                             )
                 except Exception as e:

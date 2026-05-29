@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+import logging
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -15,6 +16,8 @@ from apps.users.serializers import (
     ConsultArchiveSerializer,
 )
 from apps.users.models import ConsultArchive
+
+logger = logging.getLogger('apps.users')
 
 
 @api_view(['POST'])
@@ -79,43 +82,30 @@ def archives_view(request):
 
     consult_items = []
 
-    # 查询多智能体问诊会话（ConsultationSession）- 只查询当前用户的会话
-    debug_info = {
-        'uid': uid,
-        'total_sessions': 0,
-        'user_id_sessions': 0,
-        'empty_user_id_sessions': 0,
-        'agent_sessions_count': 0,
-    }
     try:
         from apps.agents.models import ConsultationSession
-        from django.db.models import Q
-        
-        # 调试：获取所有ConsultationSession记录
-        all_sessions = ConsultationSession.objects.all()
-        debug_info['total_sessions'] = all_sessions.count()
-        debug_info['user_id_sessions'] = ConsultationSession.objects.filter(user_id=uid).count()
-        debug_info['empty_user_id_sessions'] = ConsultationSession.objects.filter(user_id='').count()
-        
-        # 查询用户的所有问诊会话（包括未完成的）
-        # 重要：移除严格的过滤条件，以显示所有会话
+
         agent_sessions = ConsultationSession.objects.filter(
-            Q(user_id=uid) | Q(user_id='')  # 包含当前用户的会话和匿名会话
+            user_id=uid,
         ).order_by('-created_at')[:100]
-        debug_info['agent_sessions_count'] = agent_sessions.count()
         
         for session in agent_sessions:
             # 从state_data中提取数据
             state_data = session.state_data or {}
             observation = state_data.get('observation', {})
+            state_stage = str(state_data.get('current_stage') or session.current_stage or '')
+            has_report = bool(state_data.get('report_text')) and (
+                state_stage == 'done' or state_stage.endswith('.DONE')
+            )
             
             item = {
                 'session_id': session.session_id,
                 'title': session.chief_complaint or state_data.get('chief_complaint', '') or '问诊记录',
                 'create_time': session.created_at,
                 'application_id': 'tcm-agent',
-                'current_stage': session.current_stage,
+                'current_stage': state_stage or session.current_stage,
                 'is_high_risk': session.is_high_risk,
+                'has_report': has_report,
                 'chief_complaint': session.chief_complaint or state_data.get('chief_complaint', ''),
                 'primary_syndrome': session.primary_syndrome or state_data.get('primary_syndrome', ''),
                 'symptoms': [],
@@ -131,9 +121,8 @@ def archives_view(request):
             haystack = f"{item.get('title', '')} {item.get('chief_complaint', '')} {item.get('primary_syndrome', '')}".lower()
             if not query or query in haystack:
                 consult_items.append(item)
-    except Exception as e:
-        print(f"Error loading agent sessions: {e}")
-        debug_info['error'] = str(e)
+    except Exception as exc:
+        logger.exception("Error loading agent sessions: %s", exc)
 
     # 按时间排序
     consult_items.sort(key=lambda x: x.get('create_time', ''), reverse=True)
@@ -196,6 +185,20 @@ def save_consult_archive(request):
     session_id = request.data.get('session_id', '')
     if not session_id:
         return Response({'detail': 'session_id不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from apps.agents.models import ConsultationSession
+        session = ConsultationSession.objects.filter(session_id=session_id).first()
+        if session:
+            owner_id = str(session.user_id or '').strip()
+            current_user_id = str(request.user.id)
+            if owner_id and owner_id != current_user_id:
+                return Response({'detail': '无权保存该问诊会话'}, status=status.HTTP_403_FORBIDDEN)
+            if not owner_id:
+                session.user_id = current_user_id
+                session.save(update_fields=['user_id'])
+    except Exception as exc:
+        logger.warning("Failed to validate consult session ownership: %s", exc)
 
     ConsultArchive.objects.update_or_create(  # type: ignore[attr-defined]
         user=request.user,

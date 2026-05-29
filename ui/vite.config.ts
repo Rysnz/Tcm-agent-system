@@ -17,6 +17,8 @@ export default defineConfig({
     }
   },
   server: {
+    host: '0.0.0.0',
+    allowedHosts: ['rysn.xyz', '4a447b8f.r21.vip.cpolar.cn'],
     port: 3000,
     proxy: {
       '/api': {

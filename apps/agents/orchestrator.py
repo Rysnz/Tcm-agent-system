@@ -176,9 +176,11 @@ class TCMOrchestrator:
             ConsultStage.SYNDROME.value,
             ConsultStage.RECOMMENDATION.value,
             ConsultStage.SAFETY_CHECK.value,
+            ConsultStage.REPORT.value,
         }
         auto_loops = 0
-        while auto_loops < 3:
+        max_auto_loops = len(auto_progress_stages) + 1
+        while auto_loops < max_auto_loops:
             assistant_count_now = sum(
                 1 for m in state.messages if m.get("role") == "assistant"
             )
@@ -311,7 +313,8 @@ class TCMOrchestrator:
                 ConsultStage.REPORT.value,
             }
             auto_loops = 0
-            while _stage_value(new_state.current_stage) in auto_progress_stages and auto_loops < 3:
+            max_auto_loops = len(auto_progress_stages) + 1
+            while _stage_value(new_state.current_stage) in auto_progress_stages and auto_loops < max_auto_loops:
                 yield self._sse_event(
                     "stage",
                     {

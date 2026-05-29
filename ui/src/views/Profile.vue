@@ -1,45 +1,46 @@
 <template>
-  <div class="profile-page">
+  <div class="profile-page bento-layout">
     <!-- 页面头部 -->
-    <div class="page-header">
-      <h2 class="page-title">
+    <div class="page-header bento-header">
+      <h2 class="page-title gradient-text">
         <el-icon><User /></el-icon>
         个人档案
       </h2>
       <div class="header-desc">管理您的健康数据与养生记录</div>
     </div>
 
-    <!-- 健康概览卡片 -->
-    <el-card class="overview-card" shadow="never">
-      <div class="overview-header">
-        <div class="overview-icon">📊</div>
-        <div class="overview-title">健康概览</div>
+    <div class="bento-grid">
+      <!-- 健康概览卡片 (span 2 if space permits) -->
+      <div class="bento-card overview-bento">
+        <el-card shadow="never">
+          <div class="overview-header">
+            <div class="overview-icon">📊</div>
+            <div class="overview-title">健康概览</div>
+          </div>
+          <div class="overview-stats">
+            <div class="stat-item">
+              <div class="stat-value gradient-value">{{ checkinStats.total_days }}</div>
+              <div class="stat-label">打卡天数</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value gradient-value">{{ checkinStats.streak }}</div>
+              <div class="stat-label">连续打卡</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value gradient-value">{{ checkinStats.avg_completion }}%</div>
+              <div class="stat-label">平均完成率</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value gradient-value">{{ checkinStats.this_week }}</div>
+              <div class="stat-label">本周打卡</div>
+            </div>
+          </div>
+        </el-card>
       </div>
-      <div class="overview-stats">
-        <div class="stat-item">
-          <div class="stat-value">{{ checkinStats.total_days }}</div>
-          <div class="stat-label">打卡天数</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ checkinStats.streak }}</div>
-          <div class="stat-label">连续打卡</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ checkinStats.avg_completion }}%</div>
-          <div class="stat-label">平均完成率</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ checkinStats.this_week }}</div>
-          <div class="stat-label">本周打卡</div>
-        </div>
-      </div>
-    </el-card>
 
-    <!-- 主要内容区 -->
-    <el-row :gutter="20" class="main-content">
       <!-- 左侧：问诊记录 -->
-      <el-col :xs="24" :md="12">
-        <el-card class="section-card" shadow="never">
+      <div class="bento-card section-card">
+        <el-card shadow="never">
           <template #header>
             <div class="section-header">
               <span class="section-title">🩺 问诊记录</span>
@@ -59,9 +60,21 @@
                 <div class="record-time">{{ formatDate(record.create_time || record.created_at) }}</div>
               </div>
               <div class="record-tags">
+                <el-tag v-if="record.has_report" type="success" size="small">
+                  已生成报告
+                </el-tag>
                 <el-tag v-if="record.primary_syndrome" type="primary" size="small">
                   {{ record.primary_syndrome }}
                 </el-tag>
+                <el-button
+                  v-if="record.has_report"
+                  size="small"
+                  type="primary"
+                  plain
+                  @click.stop="goToConsultReport(record)"
+                >
+                  查看报告
+                </el-button>
               </div>
             </div>
           </div>
@@ -69,11 +82,11 @@
             <el-button type="primary" @click="$router.push('/consult')">开始问诊</el-button>
           </el-empty>
         </el-card>
-      </el-col>
+      </div>
 
       <!-- 右侧：舌象档案 -->
-      <el-col :xs="24" :md="12">
-        <el-card class="section-card" shadow="never">
+      <div class="bento-card section-card">
+        <el-card shadow="never">
           <template #header>
             <div class="section-header">
               <span class="section-title">👅 舌象档案</span>
@@ -111,72 +124,76 @@
             <el-button type="primary" @click="$router.push('/consult/tongue')">舌象分析</el-button>
           </el-empty>
         </el-card>
-      </el-col>
-    </el-row>
+      </div>
 
-    <!-- 养生计划记录 -->
-    <el-card class="section-card mt-20" shadow="never">
-      <template #header>
-        <div class="section-header">
-          <span class="section-title">🌿 养生计划</span>
-          <el-button type="primary" size="small" @click="$router.push('/wellness')">生成新计划</el-button>
-        </div>
-      </template>
-      
-      <div v-if="wellnessPlans.length" class="wellness-list">
-        <div 
-          v-for="plan in wellnessPlans.slice(0, 5)" 
-          :key="plan.id"
-          class="wellness-item"
-          @click="toggleWellnessExpand(plan.id)"
-        >
-          <div class="wellness-header">
-            <div class="wellness-main">
-              <el-tag type="success" size="small">{{ plan.constitution }}</el-tag>
-              <span v-if="plan.source_syndrome" class="wellness-source">基于：{{ plan.source_syndrome }}</span>
+      <!-- 养生计划记录 -->
+      <div class="bento-card section-card span-2">
+        <el-card shadow="never">
+          <template #header>
+            <div class="section-header">
+              <span class="section-title">🌿 养生计划</span>
+              <el-button type="primary" size="small" @click="$router.push('/wellness')">生成新计划</el-button>
             </div>
-            <div class="wellness-time">{{ formatDate(plan.create_time) }}</div>
-          </div>
-          <div v-if="expandedWellness === plan.id && plan.plan_json" class="wellness-detail">
-            <div v-if="plan.plan_json.theme" class="plan-theme">
-              <span class="theme-label">主题：</span>{{ plan.plan_json.theme }}
-            </div>
-            <div v-if="plan.plan_json.key_principles?.length" class="plan-principles">
-              <span class="principles-label">核心原则：</span>
-              <div class="principles-tags">
-                <el-tag v-for="p in plan.plan_json.key_principles" :key="p" type="success" effect="light" size="small">
-                  {{ p }}
-                </el-tag>
+          </template>
+          
+          <div v-if="wellnessPlans.length" class="wellness-list">
+            <div 
+              v-for="plan in wellnessPlans.slice(0, 5)" 
+              :key="plan.id"
+              class="wellness-item"
+              @click="toggleWellnessExpand(plan.id)"
+            >
+              <div class="wellness-header">
+                <div class="wellness-main">
+                  <el-tag type="success" size="small">{{ plan.constitution }}</el-tag>
+                  <span v-if="plan.source_syndrome" class="wellness-source">基于：{{ plan.source_syndrome }}</span>
+                </div>
+                <div class="wellness-time">{{ formatDate(plan.create_time) }}</div>
+              </div>
+              <div v-if="expandedWellness === plan.id && plan.plan_json" class="wellness-detail">
+                <div v-if="plan.plan_json.theme" class="plan-theme">
+                  <span class="theme-label">主题：</span>{{ plan.plan_json.theme }}
+                </div>
+                <div v-if="plan.plan_json.key_principles?.length" class="plan-principles">
+                  <span class="principles-label">核心原则：</span>
+                  <div class="principles-tags">
+                    <el-tag v-for="p in plan.plan_json.key_principles" :key="p" type="success" effect="light" size="small">
+                      {{ p }}
+                    </el-tag>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+          <el-empty v-else description="暂无养生计划" :image-size="60">
+            <el-button type="primary" @click="$router.push('/wellness')">制定养生计划</el-button>
+          </el-empty>
+        </el-card>
       </div>
-      <el-empty v-else description="暂无养生计划" :image-size="60">
-        <el-button type="primary" @click="$router.push('/wellness')">制定养生计划</el-button>
-      </el-empty>
-    </el-card>
 
-    <!-- 快捷操作 -->
-    <el-card class="section-card mt-20" shadow="never">
-      <template #header>
-        <span class="section-title">⚡ 快捷操作</span>
-      </template>
-      <div class="quick-actions">
-        <div class="action-item" @click="$router.push('/consult')">
-          <div class="action-icon">🩺</div>
-          <div class="action-label">开始问诊</div>
-        </div>
-        <div class="action-item" @click="$router.push('/consult/tongue')">
-          <div class="action-icon">👅</div>
-          <div class="action-label">舌象分析</div>
-        </div>
-        <div class="action-item" @click="$router.push('/wellness')">
-          <div class="action-icon">🌿</div>
-          <div class="action-label">养生计划</div>
-        </div>
+      <!-- 快捷操作 -->
+      <div class="bento-card section-card span-2">
+        <el-card shadow="never">
+          <template #header>
+            <span class="section-title">⚡ 快捷操作</span>
+          </template>
+          <div class="quick-actions">
+            <div class="action-item" @click="$router.push('/consult')">
+              <div class="action-icon">🩺</div>
+              <div class="action-label">开始问诊</div>
+            </div>
+            <div class="action-item" @click="$router.push('/consult/tongue')">
+              <div class="action-icon">👅</div>
+              <div class="action-label">舌象分析</div>
+            </div>
+            <div class="action-item" @click="$router.push('/wellness')">
+              <div class="action-icon">🌿</div>
+              <div class="action-label">养生计划</div>
+            </div>
+          </div>
+        </el-card>
       </div>
-    </el-card>
+    </div>
 
     <!-- 问诊详情对话框 -->
     <el-dialog v-model="consultDialogVisible" title="问诊详情" width="600px">
@@ -198,6 +215,11 @@
         <div class="detail-section">
           <div class="section-label">问诊时间</div>
           <div class="section-value">{{ formatDate(selectedConsult.create_time || selectedConsult.created_at) }}</div>
+        </div>
+        <div v-if="selectedConsult.has_report" class="detail-actions">
+          <el-button type="primary" @click="goToConsultReport(selectedConsult)">
+            查看问诊报告
+          </el-button>
         </div>
       </div>
     </el-dialog>
@@ -258,11 +280,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
-import { authApi, consultApi } from '@/api'
+import { authApi } from '@/api'
 import dayjs from 'dayjs'
+
+const router = useRouter()
 
 // 数据
 const consultRecords = ref<any[]>([])
@@ -300,16 +325,6 @@ const loadData = async () => {
   try {
     // 使用统一的档案API
     const res = await authApi.getArchives()
-    console.log('档案API响应:', res)
-    console.log('响应对象的所有键:', Object.keys(res))
-    
-    // 打印调试信息（如果存在）
-    if (res.debug) {
-      console.log('后端调试信息:', res.debug)
-    } else {
-      console.log('没有找到debug字段')
-    }
-    
     // 处理问诊记录
     consultRecords.value = res.consult_records || []
     
@@ -356,11 +371,6 @@ const loadData = async () => {
     // 计算打卡统计（从本地存储）
     calculateCheckinStats()
     
-    console.log('加载的数据:', {
-      consultRecords: consultRecords.value.length,
-      tongueRecords: tongueRecords.value.length,
-      wellnessPlans: wellnessPlans.value.length
-    })
   } catch (err) {
     console.error('加档案数据失败:', err)
     // 即使API失败，也尝试从本地存储加载养生计划
@@ -429,9 +439,6 @@ const calculateCheckinStats = () => {
     // 3. 计算统计数据
     const dates = Object.keys(allRecords)
     
-    console.log('[DEBUG] 打卡记录:', allRecords)
-    console.log('[DEBUG] 打卡日期:', dates)
-    
     checkinStats.value.total_days = dates.length
     
     // 计算连续打卡天数
@@ -445,15 +452,10 @@ const calculateCheckinStats = () => {
     checkinStats.value.streak = streak
     
     // 计算平均完成率（completion_rate 已经是百分比 0-100）
-    const completionRates = Object.values(allRecords).map((r: any) => {
-      console.log('[DEBUG] 单条记录:', r, 'completion_rate:', r.completion_rate)
-      return r.completion_rate || 0
-    })
-    console.log('[DEBUG] 所有完成率:', completionRates)
+    const completionRates = Object.values(allRecords).map((r: any) => r.completion_rate || 0)
     checkinStats.value.avg_completion = completionRates.length 
       ? Math.round(completionRates.reduce((a: number, b: number) => a + b, 0) / completionRates.length)
       : 0
-    console.log('[DEBUG] 平均完成率:', checkinStats.value.avg_completion)
     
     // 计算本周打卡数
     const weekStart = dayjs().startOf('week').format('YYYY-MM-DD')
@@ -465,8 +467,21 @@ const calculateCheckinStats = () => {
 
 // 查看问诊详情
 const viewConsultDetail = (record: any) => {
+  if (record.has_report) {
+    goToConsultReport(record)
+    return
+  }
   selectedConsult.value = record
   consultDialogVisible.value = true
+}
+
+const goToConsultReport = (record: any) => {
+  if (!record?.session_id) {
+    ElMessage.warning('该问诊记录缺少会话ID，无法查看报告')
+    return
+  }
+  consultDialogVisible.value = false
+  router.push({ path: '/consult/report', query: { session_id: record.session_id } })
 }
 
 // 切换舌象展开状态
@@ -499,385 +514,242 @@ onMounted(() => {
 <style scoped lang="scss">
 .profile-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f7fcff 0%, #f4fbf6 100%);
-  padding: 24px;
+  background-color: var(--tcm-bg-color, #f4f6f8);
+  color: var(--tcm-text-primary, #333);
+  padding: 32px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-.page-header {
-  margin-bottom: 24px;
-
-  .page-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 0 8px;
-    font-size: 24px;
-    color: #1a1a2e;
-  }
-
-  .header-desc {
-    font-size: 14px;
-    color: #888;
-  }
+.bento-header {
+  margin-bottom: 32px;
 }
 
-/* ─── 健康概览卡片 ──────────────────────────────────── */
-.overview-card {
-  border-radius: 12px;
-  margin-bottom: 20px;
-  background: linear-gradient(135deg, #e6f7ff 0%, #f0f9ff 100%);
-  border: 1px solid #b3d9ff;
-
-  .overview-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
-
-    .overview-icon { font-size: 32px; }
-    .overview-title { font-size: 18px; font-weight: 600; color: #1677ff; }
-  }
-
-  .overview-stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-
-    .stat-item {
-      text-align: center;
-      padding: 16px;
-      background: rgba(255, 255, 255, 0.8);
-      border-radius: 8px;
-
-      .stat-value {
-        font-size: 28px;
-        font-weight: 700;
-        color: #1677ff;
-        margin-bottom: 4px;
-      }
-
-      .stat-label {
-        font-size: 13px;
-        color: #666;
-      }
-    }
-  }
-}
-
-/* ─── 主要内容区 ──────────────────────────────────── */
-.main-content {
-  margin-bottom: 20px;
-}
-
-.section-card {
-  border-radius: 12px;
-  margin-bottom: 16px;
-
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    .section-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #333;
-    }
-
-    .section-count {
-      font-size: 13px;
-      color: #888;
-    }
-  }
-}
-
-.mt-20 {
-  margin-top: 20px;
-}
-
-/* ─── 问诊记录 ──────────────────────────────────── */
-.records-list {
+.gradient-text {
+  margin: 0 0 12px;
+  font-size: 32px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--tcm-accent-color, #4facfe) 0%, #00f2fe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 400px;
-  overflow-y: auto;
+  align-items: center;
+  gap: 12px;
 }
 
-.record-item {
+.header-desc {
+  font-size: 16px;
+  color: var(--tcm-text-regular, #666);
+  font-weight: 500;
+}
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 1024px) {
+  .span-2 {
+    grid-column: span 1;
+  }
+}
+
+.overview-bento {
+  grid-column: 1 / -1;
+}
+
+.bento-card {
+  border-radius: 32px;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease;
+}
+
+.bento-card:hover {
+  transform: translateY(-4px) scale(1.01);
+}
+
+.bento-card:hover :deep(.el-card) {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08) !important;
+}
+
+:deep(.el-card) {
+  border-radius: 32px !important;
+  border: none !important;
+  background: var(--tcm-card-bg, #ffffff) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
+  height: 100%;
+}
+
+:deep(.el-card__body) {
+  padding: 32px !important;
+}
+
+:deep(.el-card__header) {
+  border-bottom: none !important;
+  padding: 32px 32px 0 32px !important;
+}
+
+.overview-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  .overview-icon { font-size: 32px; }
+  .overview-title { font-size: 20px; font-weight: 700; color: var(--tcm-accent-color, #4facfe); }
+}
+
+.overview-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 24px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 32px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%);
+  border-radius: 24px;
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 4px 20px rgba(0,0,0,0.02);
+}
+
+.gradient-value {
+  font-size: 3rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--tcm-text-primary, #111) 0%, #555 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 12px;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--tcm-text-regular, #666);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
-  background: #fafafa;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid transparent;
-
-  &:hover {
-    border-color: #1677ff;
-    background: #f0f7ff;
+  .section-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--tcm-text-primary);
   }
-
-  .record-main {
-    flex: 1;
-
-    .record-complaint {
-      font-size: 14px;
-      color: #333;
-      margin-bottom: 4px;
-    }
-
-    .record-time {
-      font-size: 12px;
-      color: #999;
-    }
-  }
-
-  .record-tags {
-    margin-left: 12px;
+  .section-count {
+    font-size: 14px;
+    color: var(--tcm-accent-color);
+    background: rgba(0,0,0,0.03);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: 600;
   }
 }
 
-/* ─── 舌象档案 ──────────────────────────────────── */
-.tongue-list {
+.records-list, .tongue-list, .wellness-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
   max-height: 400px;
   overflow-y: auto;
+  padding-right: 8px;
 }
 
-.tongue-item {
-  padding: 12px;
-  background: #fafafa;
-  border-radius: 8px;
+.record-item, .tongue-item, .wellness-item {
+  padding: 20px;
+  background: var(--tcm-bg-color, #f9fafb);
+  border-radius: 20px;
   cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid transparent;
-
+  transition: all 0.3s;
+  border: none;
+  
   &:hover {
-    border-color: #1677ff;
-    background: #f0f7ff;
-  }
-
-  .tongue-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    .tongue-features {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-    }
-
-    .tongue-time {
-      font-size: 12px;
-      color: #999;
-      white-space: nowrap;
-    }
-  }
-
-  .tongue-detail {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #e8eaf0;
-
-    .diagnosis-summary {
-      font-size: 13px;
-      color: #333;
-      line-height: 1.6;
-      margin-bottom: 8px;
-    }
-
-    .diagnosis-suggestions {
-      .suggestions-title {
-        font-size: 12px;
-        color: #666;
-        margin-bottom: 4px;
-      }
-
-      ul {
-        margin: 0;
-        padding-left: 16px;
-
-        li {
-          font-size: 12px;
-          color: #666;
-          margin: 4px 0;
-        }
-      }
-    }
+    transform: translateX(6px);
+    background: var(--tcm-card-bg, #fff);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
   }
 }
 
-/* ─── 养生计划 ──────────────────────────────────── */
-.wellness-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.wellness-item {
-  padding: 12px;
-  background: #fafafa;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid transparent;
-
-  &:hover {
-    border-color: #1677ff;
-    background: #f0f7ff;
-  }
-
-  .wellness-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    .wellness-main {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-
-      .wellness-source {
-        font-size: 12px;
-        color: #666;
-      }
-    }
-
-    .wellness-time {
-      font-size: 12px;
-      color: #999;
-      white-space: nowrap;
-    }
-  }
-
-  .wellness-detail {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #e8eaf0;
-
-    .plan-theme {
-      font-size: 13px;
-      color: #333;
-      margin-bottom: 8px;
-
-      .theme-label {
-        color: #666;
-      }
-    }
-
-    .plan-principles {
-      .principles-label {
-        font-size: 12px;
-        color: #666;
-        margin-bottom: 4px;
-        display: block;
-      }
-
-      .principles-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-      }
-    }
-  }
-}
-
-/* ─── 快捷入口 ──────────────────────────────────── */
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 24px;
+}
+
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 16px;
+  padding: 32px;
+  background: var(--tcm-bg-color, #f9fafb);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: none;
 
-  .action-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 20px;
-    background: #fafafa;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: 1px solid transparent;
+  &:hover {
+    transform: translateY(-8px);
+    background: var(--tcm-card-bg, #fff);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+  }
 
-    &:hover {
-      border-color: #1677ff;
-      background: #f0f7ff;
-      transform: translateY(-2px);
-    }
+  .action-icon {
+    font-size: 42px;
+    transition: transform 0.3s;
+  }
+  &:hover .action-icon {
+    transform: scale(1.1);
+  }
 
-    .action-icon {
-      font-size: 32px;
-    }
-
-    .action-label {
-      font-size: 14px;
-      color: #333;
-    }
+  .action-label {
+    font-size: 16px;
+    color: var(--tcm-text-primary);
+    font-weight: 600;
   }
 }
 
-/* ─── 详情对话框 ──────────────────────────────────── */
-.detail-content {
-  .detail-section {
-    margin-bottom: 16px;
-
-    .section-label {
-      font-size: 13px;
-      color: #888;
-      margin-bottom: 8px;
-    }
-
-    .section-value {
-      font-size: 15px;
-      color: #333;
-    }
-  }
-
-  .feature-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-
-    .feature-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 12px;
-      background: #fafafa;
-      border-radius: 6px;
-
-      .feature-label {
-        font-size: 13px;
-        color: #666;
-      }
-    }
-  }
-
-  .symptom-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
+/* Base styles for list inner elements */
+.record-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.record-main { min-width: 0; flex: 1; }
+.record-main .record-complaint { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+.record-main .record-time { font-size: 13px; color: var(--tcm-text-regular); }
+.record-tags {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
 }
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+.tongue-header { display: flex; justify-content: space-between; align-items: center; }
+.tongue-features { display: flex; gap: 8px; flex-wrap: wrap; }
+.tongue-detail { margin-top: 16px; padding-top: 16px; border-top: 1px dashed rgba(0,0,0,0.1); }
+.wellness-header { display: flex; justify-content: space-between; align-items: center; }
+.wellness-main { display: flex; align-items: center; gap: 12px; }
+.wellness-detail { margin-top: 16px; padding-top: 16px; border-top: 1px dashed rgba(0,0,0,0.1); }
 
-@media (max-width: 768px) {
-  .overview-stats {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-
-  .quick-actions {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-
-  .tongue-list {
-    grid-template-columns: 1fr !important;
-  }
+:deep(.el-dialog) {
+  border-radius: 24px !important;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.1) !important;
 }
 </style>

@@ -80,8 +80,10 @@ onUnmounted(() => {
 
 <style scoped>
 .model-management-container {
-  padding: 20px;
-  height: 100vh;
+  padding: 30px;
+  min-height: calc(100vh - 70px);
+  background: transparent;
+  color: var(--tcm-text-primary);
   overflow: auto;
 }
 
@@ -89,16 +91,76 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  background: linear-gradient(to right, var(--tcm-text-primary), var(--tcm-accent-color));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 0.5px;
 }
 
 .model-list-card {
+  background: color-mix(in srgb, var(--tcm-card-bg) 60%, transparent) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--tcm-border-color) !important;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
   margin-bottom: 20px;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+:deep(.el-card__header) {
+  border-bottom: 1px solid var(--tcm-border-color);
+  background: color-mix(in srgb, var(--tcm-text-primary) 2%, transparent);
+  padding: 20px 24px;
+}
+
+.card-header span {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--tcm-text-primary);
+  letter-spacing: 0.5px;
+}
+
+/* Table dark theme overrides */
+:deep(.el-table) {
+  background-color: transparent !important;
+  --el-table-border-color: var(--tcm-border-color);
+  --el-table-header-bg-color: color-mix(in srgb, var(--tcm-text-primary) 3%, transparent);
+  --el-table-header-text-color: var(--tcm-text-regular);
+  --el-table-row-hover-bg-color: color-mix(in srgb, var(--tcm-accent-color) 8%, transparent);
+}
+
+:deep(.el-table th.el-table__cell),
+:deep(.el-table tr),
+:deep(.el-table td.el-table__cell) {
+  background-color: transparent !important;
+  border-bottom: 1px solid var(--tcm-border-color) !important;
+  color: var(--tcm-text-primary);
+}
+
+:deep(.el-table::before) {
+  display: none;
+}
+
+:deep(.el-table__empty-block) {
+  background-color: transparent !important;
+}
+
+:deep(.el-switch__core) {
+  border-color: var(--tcm-border-color);
+  background-color: var(--tcm-border-color);
+}
+
+:deep(.el-switch.is-checked .el-switch__core) {
+  border-color: var(--tcm-accent-color);
+  background-color: var(--tcm-accent-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tcm-accent-color) 40%, transparent);
 }
 </style>

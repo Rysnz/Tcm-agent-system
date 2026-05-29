@@ -402,36 +402,60 @@ onMounted(() => {
 
 <style scoped>
 .overview-container {
-  padding: 20px;
+  padding: 30px;
+  background: transparent;
+  min-height: calc(100vh - 70px);
+  color: #f3f4f6;
+  overflow: auto;
 }
 
 .overview-card {
   max-width: 1200px;
   margin: 0 auto;
+  background: rgba(15, 15, 15, 0.6) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+:deep(.overview-card > .el-card__header) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 20px 24px;
+}
+
+.card-header span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.5px;
 }
 
 .section {
-  margin-bottom: 20px;
+  margin-bottom: 30px;
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  margin-bottom: 15px;
-  color: #303133;
+  margin-bottom: 20px;
+  color: #fff;
+  border-left: 3px solid #10b981;
+  padding-left: 10px;
+}
+
+:deep(.el-divider) {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  margin: 30px 0;
 }
 
 /* 应用信息 */
 .app-info {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
 }
 
 .app-icon-container {
@@ -443,20 +467,23 @@ onMounted(() => {
 .app-icon {
   width: 100px;
   height: 100px;
-  border-radius: 8px;
+  border-radius: 16px;
   object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .app-icon-placeholder {
   width: 100px;
   height: 100px;
-  border-radius: 8px;
-  background-color: #f5f7fa;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #10b981, #059669);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 40px;
-  color: #909399;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .app-details {
@@ -464,31 +491,51 @@ onMounted(() => {
 }
 
 .app-name {
-  margin: 0 0 10px 0;
-  font-size: 20px;
+  margin: 0 0 12px 0;
+  font-size: 24px;
   font-weight: 600;
-  color: #303133;
+  color: #fff;
 }
 
 .app-desc {
   margin: 0;
-  color: #606266;
-  line-height: 1.5;
+  color: #9ca3af;
+  line-height: 1.6;
+  font-size: 15px;
 }
 
 /* 公开访问链接 */
 .access-link {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
+}
+
+:deep(.access-link .el-input__wrapper) {
+  background-color: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+:deep(.access-link .el-input__inner) {
+  color: #10b981;
+  font-family: monospace;
 }
 
 /* 监控统计 */
 .stats-header {
   display: flex;
   align-items: center;
-  gap: 15px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+:deep(.stats-header .el-input__wrapper) {
+  background-color: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+:deep(.stats-header .el-input__inner) {
+  color: #fff;
 }
 
 .date-picker-container {
@@ -498,94 +545,102 @@ onMounted(() => {
 .stats-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 30px;
+  gap: 24px;
+  margin-bottom: 36px;
 }
 
 .stat-card {
   text-align: center;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+  border-color: rgba(16, 185, 129, 0.3) !important;
 }
 
 .stat-content {
-  padding: 20px 0;
+  padding: 24px 0;
 }
 
 .stat-number {
-  font-size: 32px;
-  font-weight: bold;
-  color: #409eff;
-  margin-bottom: 10px;
-}
-
-.stat-number.liked {
-  color: #13ce66;
+  font-size: 36px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 12px;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
 .stat-label {
   font-size: 14px;
-  color: #606266;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .satisfaction-content {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
+  gap: 30px;
 }
 
 .satisfaction-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
 
 .liked-icon {
   font-size: 24px;
-  color: #13ce66;
+  color: #10b981;
 }
 
 .disliked-icon {
   font-size: 24px;
-  color: #f56c6c;
+  color: #ef4444;
 }
 
 .satisfaction-number {
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 28px;
+  font-weight: 700;
 }
 
 .satisfaction-number.liked {
-  color: #13ce66;
+  color: #10b981;
+  text-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
 }
 
 .satisfaction-number.disliked {
-  color: #f56c6c;
+  color: #ef4444;
+  text-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
 }
 
 .satisfaction-label {
-  margin-top: 8px;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #606266;
+  margin-top: 4px;
+  margin-bottom: 16px;
 }
 
 .chart-container {
-  margin-top: 30px;
+  margin-top: 40px;
 }
 
 .chart-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
-  margin-bottom: 15px;
-  color: #303133;
+  margin-bottom: 20px;
+  color: #fff;
 }
 
 .chart-wrapper {
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 24px;
   height: 400px;
 }
 
@@ -598,26 +653,27 @@ onMounted(() => {
 .chart-header {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .legend {
   display: flex;
-  gap: 20px;
+  gap: 24px;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: #606266;
+  gap: 8px;
+  font-size: 13px;
+  color: #d1d5db;
 }
 
 .legend-color {
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
 }
 
 .chart-content {
@@ -628,9 +684,9 @@ onMounted(() => {
 .x-axis {
   display: flex;
   justify-content: space-between;
-  margin-top: 10px;
+  margin-top: 16px;
   font-size: 12px;
-  color: #909399;
+  color: #9ca3af;
 }
 
 .x-label {
@@ -640,7 +696,7 @@ onMounted(() => {
 
 .chart-body {
   position: relative;
-  height: calc(100% - 30px);
+  height: calc(100% - 36px);
   display: flex;
 }
 
@@ -655,7 +711,7 @@ onMounted(() => {
 
 .grid-line {
   height: 1px;
-  background-color: #ebeef5;
+  background-color: rgba(255, 255, 255, 0.05);
   margin: 59px 0;
 }
 
@@ -676,10 +732,11 @@ onMounted(() => {
 .line-svg {
   width: 100%;
   height: 100%;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
 }
 
 .line {
-  transition: all 0.3s ease;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .data-point {
@@ -689,7 +746,7 @@ onMounted(() => {
 
 .data-point:hover {
   r: 6;
-  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.3));
+  filter: brightness(1.5) drop-shadow(0 0 8px currentColor);
 }
 
 .y-axis {
@@ -697,9 +754,9 @@ onMounted(() => {
   flex-direction: column;
   justify-content: space-between;
   align-items: flex-end;
-  padding-right: 10px;
+  padding-right: 16px;
   font-size: 12px;
-  color: #909399;
+  color: #9ca3af;
 }
 
 .y-label {
@@ -708,40 +765,45 @@ onMounted(() => {
 
 .tooltip {
   position: fixed;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(20, 20, 20, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: white;
-  padding: 10px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
   z-index: 1000;
   pointer-events: none;
   transform: translate(-50%, -100%);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
 }
 
 .tooltip-header {
-  font-weight: bold;
-  margin-bottom: 5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  padding-bottom: 5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+  color: #d1d5db;
 }
 
 .tooltip-content {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
 .tooltip-item {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 16px;
 }
 
 .tooltip-label {
-  color: #ccc;
+  color: #9ca3af;
 }
 
 .tooltip-value {
-  font-weight: bold;
+  font-weight: 600;
+  color: #fff;
 }
 </style>

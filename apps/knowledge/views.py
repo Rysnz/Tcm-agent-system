@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.core.exceptions import ValidationError
 from apps.knowledge.models import KnowledgeBase, Document
 from apps.knowledge.serializers import KnowledgeBaseSerializer, DocumentSerializer
 from apps.knowledge.vector.pg_vector import PGVectorStore
@@ -15,7 +16,7 @@ logger = logging.getLogger('apps')
 class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     queryset = KnowledgeBase.objects.filter(is_delete=False)
     serializer_class = KnowledgeBaseSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsStaffUser]
     
     def perform_create(self, serializer):
         serializer.save(user_id=self.request.user.id)
@@ -80,7 +81,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.filter(is_delete=False)
     serializer_class = DocumentSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsStaffUser]
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -89,7 +90,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(knowledge_base_id=knowledge_base_id)
         return queryset
     
-    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=True, methods=['get'])
     def paragraphs(self, request, pk=None):
         """
         获取文档的段落列表
@@ -264,7 +265,6 @@ class DocumentUploadView(APIView):
                 try:
                     # 首先记录线程启动日志
                     logger.info(f"文档处理线程启动: {document.id}, file_path: {absolute_file_path}, file_type: {file_type}")
-                    print(f"[INFO] 文档处理线程启动: {document.id}, file_path: {absolute_file_path}, file_type: {file_type}")
                     
                     # 初始化进度
                     document.progress = 0
@@ -274,11 +274,9 @@ class DocumentUploadView(APIView):
                     # 再次检查文件是否存在，确保线程中能访问到
                     if os.path.exists(absolute_file_path):
                         logger.info(f"线程中文件存在: {absolute_file_path}, 文件大小: {os.path.getsize(absolute_file_path)} bytes")
-                        print(f"[INFO] 线程中文件存在: {absolute_file_path}, 文件大小: {os.path.getsize(absolute_file_path)} bytes")
                     else:
                         error_msg = f"线程中文件不存在: {absolute_file_path}"
                         logger.error(error_msg)
-                        print(f"[ERROR] {error_msg}")
                         # 更新文档状态为failed
                         document.status = 'failed'
                         document.progress = 100
@@ -288,63 +286,50 @@ class DocumentUploadView(APIView):
                     
                     # 创建处理器实例
                     logger.info(f"创建处理器实例: {document.id}")
-                    print(f"[INFO] 创建处理器实例: {document.id}")
                     processor = DocumentProcessor(knowledge_base_id)
                     logger.info(f"处理器实例创建成功: {document.id}")
-                    print(f"[INFO] 处理器实例创建成功: {document.id}")
                     
                     # 提取文本
                     logger.info(f"开始提取文本: {document.id}, 文件路径: {absolute_file_path}, 文件类型: {file_type}")
-                    print(f"[INFO] 开始提取文本: {document.id}")
                     paragraphs = processor._extract_text(absolute_file_path, file_type)
                     logger.info(f"提取文本完成，共{len(paragraphs)}段: {document.id}")
-                    print(f"[INFO] 提取文本完成，共{len(paragraphs)}段: {document.id}")
                     
                     # 添加更详细的日志，显示前3个段落的内容
                     for i, para in enumerate(paragraphs[:3]):
                         logger.info(f"段落{i+1}内容: {para['content'][:100]}...")
-                        print(f"[INFO] 段落{i+1}内容: {para['content'][:100]}...")
                     
                     document.progress = 50
                     document.char_count = sum(len(p['content']) for p in paragraphs)
                     document.paragraph_count = len(paragraphs)
                     document.save()
                     logger.info(f"进度更新为50%: {document.id}")
-                    print(f"[INFO] 进度更新为50%: {document.id}")
                     
                     try:
                         # 处理段落和生成向量
                         logger.info(f"开始处理段落和生成向量: {document.id}")
-                        print(f"[INFO] 开始处理段落和生成向量: {document.id}")
                         processor._process_paragraphs(document, paragraphs)
                         logger.info(f"处理段落和生成向量完成: {document.id}")
-                        print(f"[INFO] 处理段落和生成向量完成: {document.id}")
                         
                         document.progress = 100
                         document.status = 'completed'
                         document.save()
                         logger.info(f"文档处理完成: {document.id}, 字符数: {document.char_count}, 段落数: {document.paragraph_count}")
-                        print(f"[INFO] 文档处理完成: {document.id}, 字符数: {document.char_count}, 段落数: {document.paragraph_count}")
                         
                         # 验证向量存储是否成功
                         from apps.knowledge.models import Embedding
                         vector_count = Embedding.objects.filter(paragraph__document=document).count()
                         logger.info(f"文档向量存储数量: {vector_count}, 段落数量: {document.paragraph_count}")
-                        print(f"[INFO] 文档向量存储数量: {vector_count}, 段落数量: {document.paragraph_count}")
                     except Exception as vector_error:
                         error_msg = f"向量化处理失败: {type(vector_error).__name__}: {str(vector_error)}"
                         logger.error(error_msg, exc_info=True)
-                        print(f"[ERROR] {error_msg}")
                         # 向量化失败时，文档状态设置为partially_completed，保留已处理的文本信息
                         document.status = 'partially_completed'
                         document.meta = {'error': error_msg}
                         document.save()
                         logger.info(f"文档部分处理完成: {document.id}, 字符数: {document.char_count}, 段落数: {document.paragraph_count}")
-                        print(f"[INFO] 文档部分处理完成: {document.id}, 字符数: {document.char_count}, 段落数: {document.paragraph_count}")
                 except Exception as e:
                     error_msg = f"处理文档时发生异常: {type(e).__name__}: {str(e)}"
                     logger.error(error_msg, exc_info=True)
-                    print(f"[ERROR] {error_msg}")
                     # 更新文档状态为failed
                     try:
                         document.status = 'failed'
@@ -354,10 +339,8 @@ class DocumentUploadView(APIView):
                             document.progress = 100
                         document.save()
                         logger.info(f"异常状态更新完成: {document.id}, 最终进度: {document.progress}%")
-                        print(f"[INFO] 异常状态更新完成: {document.id}, 最终进度: {document.progress}%")
                     except Exception as update_error:
                         logger.error(f"更新异常状态失败: {document.id}, 错误: {str(update_error)}")
-                        print(f"[ERROR] 更新异常状态失败: {document.id}, 错误: {str(update_error)}")
             
             # 启动异步线程处理文档
             logger.info(f"准备启动文档处理线程: {document.id}")
@@ -397,6 +380,11 @@ class KnowledgeSearchView(APIView):
         # 获取知识库配置
         try:
             knowledge_base = KnowledgeBase.objects.get(id=knowledge_base_id)
+        except (ValueError, ValidationError):
+            return Response(
+                {'error': 'knowledge_base_id must be a valid UUID'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except KnowledgeBase.DoesNotExist:
             return Response(
                 {'error': 'Knowledge base not found'},

@@ -38,8 +38,8 @@ class KnowledgeBase(BaseModel):
     is_active = models.BooleanField(default=True, verbose_name='是否激活')
     
     # 检索相关设置
-    embedding_model = models.CharField(max_length=128, default='shibing624/text2vec-base-chinese', verbose_name='嵌入模型')
-    embedding_dimension = models.IntegerField(default=768, verbose_name='向量维度')
+    embedding_model = models.CharField(max_length=128, default='bge-m3', verbose_name='嵌入模型')
+    embedding_dimension = models.IntegerField(default=1024, verbose_name='向量维度')
     similarity_threshold = models.FloatField(default=0.5, verbose_name='相似度阈值')
     search_type = models.CharField(max_length=16, default='blend', choices=[
         ('embedding', '向量搜索'),

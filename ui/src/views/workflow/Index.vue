@@ -1,56 +1,65 @@
 <template>
-  <div class="workflow-container">
-    <div class="header">
-      <h2>工作流编辑器</h2>
-      <div class="header-actions">
-        <el-button type="primary" @click="saveWorkflow">
-          <el-icon><Check /></el-icon>
-          保存工作流
-        </el-button>
-        <el-button @click="validateWorkflow">
-          <el-icon><CircleCheck /></el-icon>
-          验证工作流
-        </el-button>
-      </div>
+  <div class="workflow-container awwwards-theme">
+    <div class="ambient-bg">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="noise-overlay"></div>
     </div>
     
-    <div class="workflow-canvas" ref="canvasRef">
-      <div
-        v-for="node in nodes"
-        :key="node.id"
-        class="workflow-node"
-        :style="getNodeStyle(node)"
-        @mousedown="startDrag(node, $event)"
-      >
-        <div class="node-header">{{ getNodeLabel(node) }}</div>
-        <div class="node-body">{{ getNodeDescription(node) }}</div>
+    <div class="main-content">
+      <div class="header glass-panel">
+        <h2 class="gradient-text">工作流编辑器</h2>
+        <div class="header-actions">
+          <button class="btn-glow" @click="saveWorkflow">
+            <el-icon><Check /></el-icon>
+            保存工作流
+          </button>
+          <button class="btn-outline" @click="validateWorkflow">
+            <el-icon><CircleCheck /></el-icon>
+            验证工作流
+          </button>
+        </div>
       </div>
       
-      <svg class="workflow-edges">
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="10"
-            refY="3.5"
-            orient="auto"
-          >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#409eff" />
-          </marker>
-        </defs>
-        <line
-          v-for="edge in edges"
-          :key="edge.id"
-          :x1="getNodePosition(edge.source).x + 150"
-          :y1="getNodePosition(edge.source).y + 30"
-          :x2="getNodePosition(edge.target).x"
-          :y2="getNodePosition(edge.target).y + 30"
-          stroke="#409eff"
-          stroke-width="2"
-          marker-end="url(#arrowhead)"
-        />
-      </svg>
+      <div class="workflow-canvas glass-panel" ref="canvasRef">
+        <div
+          v-for="node in nodes"
+          :key="node.id"
+          class="workflow-node"
+          :style="getNodeStyle(node)"
+          :data-type="node.type"
+          @mousedown="startDrag(node, $event)"
+        >
+          <div class="node-header">{{ getNodeLabel(node) }}</div>
+          <div class="node-body">{{ getNodeDescription(node) }}</div>
+        </div>
+        
+        <svg class="workflow-edges">
+          <defs>
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="7"
+              refX="10"
+              refY="3.5"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3.5, 0 7" class="edge-arrow" />
+            </marker>
+          </defs>
+          <line
+            v-for="edge in edges"
+            :key="edge.id"
+            :x1="getNodePosition(edge.source).x + 150"
+            :y1="getNodePosition(edge.source).y + 30"
+            :x2="getNodePosition(edge.target).x"
+            :y2="getNodePosition(edge.target).y + 30"
+            stroke-width="2"
+            class="edge-line"
+            marker-end="url(#arrowhead)"
+          />
+        </svg>
+      </div>
     </div>
     
     <el-dialog v-model="showNodeDialog" title="节点配置" width="600px">
@@ -84,8 +93,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showNodeDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveNodeConfig">确定</el-button>
+        <el-button @click="showNodeDialog = false" class="btn-outline">取消</el-button>
+        <el-button type="primary" @click="saveNodeConfig" class="btn-glow">确定</el-button>
       </template>
     </el-dialog>
   </div>
@@ -280,66 +289,174 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.workflow-container {
-  height: calc(100vh - 60px);
-  display: flex;
-  flex-direction: column;
+<style scoped lang="scss">
+.awwwards-theme {
+  position: relative;
+  width: 100%;
+  min-height: calc(100vh - 60px);
+  background-color: #050505;
+  color: #ffffff;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+/* 动态背景 */
+.ambient-bg {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none; overflow: hidden;
+}
+.orb {
+  position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.3;
+  animation: float 20s infinite ease-in-out alternate;
+}
+.orb-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(20,184,166,0.3) 0%, transparent 70%); }
+.orb-2 { bottom: -20%; right: -10%; width: 60vw; height: 60vw; background: radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%); animation-delay: -5s; }
+.noise-overlay {
+  position: absolute; inset: 0;
+  background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)" opacity="0.05"/%3E%3C/svg%3E');
+  mix-blend-mode: overlay;
+}
+
+@keyframes float {
+  0% { transform: scale(1) translate(0, 0); }
+  50% { transform: scale(1.1) translate(2%, 2%); }
+  100% { transform: scale(0.9) translate(-2%, -2%); }
+}
+
+.main-content {
+  position: relative; z-index: 10; display: flex; flex-direction: column;
+  height: 100%; padding: 20px; box-sizing: border-box; gap: 20px;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  background: #fff;
-  border-bottom: 1px solid #ebeef5;
+  padding: 20px 32px;
 }
 
-.header h2 {
-  margin: 0;
+.gradient-text {
+  margin: 0; font-size: 24px; font-weight: 700;
+  background: linear-gradient(to right, #fff, #14b8a6, #8b5cf6);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
 
 .header-actions {
   display: flex;
-  gap: 10px;
+  gap: 16px;
 }
+
+/* 发光按钮 */
+.btn-glow {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px; background: linear-gradient(135deg, rgba(20,184,166,0.2), rgba(139,92,246,0.2));
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; color: #fff; font-size: 14px; cursor: pointer; transition: all 0.4s;
+}
+.btn-glow:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(20, 184, 166, 0.3); border-color: rgba(255,255,255,0.3); }
+
+.btn-outline {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 100px; color: #fff; font-size: 14px; background: transparent; cursor: pointer; transition: all 0.3s;
+}
+.btn-outline:hover { background: rgba(255, 255, 255, 0.05); border-color: #fff; }
 
 .workflow-canvas {
   flex: 1;
   position: relative;
-  background: #f5f7fa;
   overflow: hidden;
+  box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
+/* 节点玻璃拟态化 */
 .workflow-node {
   position: absolute;
-  width: 150px;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  width: 180px;
+  border-radius: 12px;
   cursor: move;
+  background-color: rgba(20, 20, 20, 0.7) !important;
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  transition: box-shadow 0.3s, border-color 0.3s;
+  overflow: hidden;
+}
+.workflow-node:hover {
+  box-shadow: 0 12px 40px rgba(20,184,166,0.3);
+  border-color: rgba(20,184,166,0.5);
 }
 
+/* 根据 data-type 注入光效 */
+.workflow-node[data-type="start"]::before { content:''; position:absolute; top:0; left:0; width:100%; height:4px; background: #10b981; }
+.workflow-node[data-type="llm"]::before { content:''; position:absolute; top:0; left:0; width:100%; height:4px; background: #8b5cf6; }
+.workflow-node[data-type="knowledge_retrieval"]::before { content:''; position:absolute; top:0; left:0; width:100%; height:4px; background: #14b8a6; }
+.workflow-node[data-type="tool_call"]::before { content:''; position:absolute; top:0; left:0; width:100%; height:4px; background: #f59e0b; }
+.workflow-node[data-type="end"]::before { content:''; position:absolute; top:0; left:0; width:100%; height:4px; background: #ef4444; }
+
 .node-header {
-  padding: 8px 12px;
+  padding: 12px 16px;
   color: #fff;
-  font-weight: bold;
-  border-radius: 4px 4px 0 0;
+  font-weight: 600;
+  font-size: 14px;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
 .node-body {
-  padding: 12px;
-  background: #fff;
-  border-radius: 0 0 4px 4px;
+  padding: 12px 16px;
+  color: #a1a1aa;
   font-size: 12px;
+  line-height: 1.5;
 }
 
 .workflow-edges {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0; width: 100%; height: 100%;
   pointer-events: none;
+}
+.edge-line {
+  stroke: rgba(20, 184, 166, 0.6);
+  transition: stroke 0.3s;
+}
+.edge-arrow {
+  fill: rgba(20, 184, 166, 0.6);
+}
+
+/* 弹窗及表单暗黑覆盖 */
+:deep(.el-dialog) {
+  background: rgba(15, 15, 15, 0.85) !important;
+  backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+}
+:deep(.el-dialog__title) { color: #fff; font-weight: 600; }
+:deep(.el-form-item__label) { color: #a1a1aa !important; }
+:deep(.el-input__wrapper), :deep(.el-textarea__inner) {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+  color: #fff;
+}
+:deep(.el-input__inner) { color: #fff; }
+:deep(.el-select-dropdown) {
+  background: rgba(20, 20, 20, 0.9) !important;
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(20px);
+}
+:deep(.el-select-dropdown__item) { color: #a1a1aa; }
+:deep(.el-select-dropdown__item.hover), :deep(.el-select-dropdown__item:hover) {
+  background: rgba(255,255,255,0.08); color: #fff;
 }
 </style>

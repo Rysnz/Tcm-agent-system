@@ -14,10 +14,15 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import uuid
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone as dt_timezone
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from django.http import StreamingHttpResponse
+from django.conf import settings
+from django.http import HttpResponse, StreamingHttpResponse
+from django.utils import timezone as django_timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, parser_classes, permission_classes
@@ -32,6 +37,393 @@ from apps.agents.session_state import ConsultStage, SessionState
 from apps.model_provider.models import ModelConfig
 
 logger = logging.getLogger("apps.agents")
+
+
+PDF_PAGE_WIDTH = 595
+PDF_PAGE_HEIGHT = 842
+PDF_MARGIN_X = 48
+PDF_MARGIN_TOP = 46
+PDF_MARGIN_BOTTOM = 52
+
+
+def _find_pdf_font(prefer_bold: bool = False) -> Optional[str]:
+    """Find a local CJK-capable font for PyMuPDF PDF generation."""
+    env_font = os.environ.get("TCM_REPORT_PDF_BOLD_FONT" if prefer_bold else "TCM_REPORT_PDF_FONT")
+    candidates = [env_font] if env_font else []
+    if prefer_bold:
+        candidates.extend([
+            r"C:\Windows\Fonts\msyhbd.ttc",
+            r"C:\Windows\Fonts\simhei.ttf",
+            "/System/Library/Fonts/PingFang.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        ])
+    candidates.extend([
+        r"C:\Windows\Fonts\msyh.ttc",
+        r"C:\Windows\Fonts\simsun.ttc",
+        "/System/Library/Fonts/PingFang.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    ])
+    for path in candidates:
+        if path and os.path.exists(path):
+            return path
+    return None
+
+
+def _clean_report_text(value: Any) -> str:
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("⚠️", "").replace("⚠", "").replace("\ufe0f", "")
+    text = re.sub(r"[ \t]+", " ", text)
+    return text.strip()
+
+
+def _format_pdf_percent(value: Any) -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if number <= 1:
+        number *= 100
+    return f"{round(number)}%"
+
+
+def _to_local_datetime(value: Any) -> Optional[datetime]:
+    """Normalize stored datetimes to the current Django timezone for display."""
+    if not value:
+        return None
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    if django_timezone.is_naive(value):
+        value = django_timezone.make_aware(value, dt_timezone.utc)
+    return django_timezone.localtime(value)
+
+
+class _PdfReportBuilder:
+    def __init__(self, title: str):
+        import fitz
+
+        self.fitz = fitz
+        self.doc = fitz.open()
+        # PyMuPDF's built-in CJK font mapping keeps Chinese text readable and
+        # extractable. Latin text is drawn with Helvetica to avoid the wide
+        # character spacing of the CJK font for UUIDs, dates, and dosages.
+        self.regular_font_name = "china-s"
+        self.bold_font_name = "china-s"
+        self.ascii_font_name = "helv"
+        self.ascii_bold_font_name = "hebo"
+        self.regular = fitz.Font(self.regular_font_name)
+        self.bold = fitz.Font(self.bold_font_name)
+        self.ascii_regular = fitz.Font(self.ascii_font_name)
+        self.ascii_bold = fitz.Font(self.ascii_bold_font_name)
+        self.page = None
+        self.y = PDF_MARGIN_TOP
+        self.page_no = 0
+        self.title = title
+        self._new_page()
+
+    @property
+    def content_width(self) -> float:
+        return PDF_PAGE_WIDTH - (PDF_MARGIN_X * 2)
+
+    def _new_page(self) -> None:
+        self.page = self.doc.new_page(width=PDF_PAGE_WIDTH, height=PDF_PAGE_HEIGHT)
+        self.page_no += 1
+        self.y = PDF_MARGIN_TOP
+
+    def _font_name(self, bold: bool = False) -> str:
+        return self.bold_font_name if bold else self.regular_font_name
+
+    def _font(self, bold: bool = False):
+        return self.bold if bold else self.regular
+
+    def _font_for_char(self, char: str, bold: bool = False):
+        if ord(char) < 128:
+            return self.ascii_bold if bold else self.ascii_regular
+        return self._font(bold)
+
+    def _font_name_for_char(self, char: str, bold: bool = False) -> str:
+        if ord(char) < 128:
+            return self.ascii_bold_font_name if bold else self.ascii_font_name
+        return self._font_name(bold)
+
+    def _text_length(self, text: str, size: float, bold: bool = False) -> float:
+        width = 0.0
+        for char in text:
+            width += self._font_for_char(char, bold).text_length(char, fontsize=size)
+        return width
+
+    def _insert_mixed_text(
+        self,
+        x: float,
+        y: float,
+        text: str,
+        *,
+        size: float,
+        bold: bool,
+        color: Tuple[float, float, float],
+    ) -> None:
+        if not text:
+            return
+        run = text[0]
+        run_font_name = self._font_name_for_char(text[0], bold)
+        cursor_x = x
+
+        def flush(value: str, font_name: str, draw_x: float) -> float:
+            self.page.insert_text(
+                (draw_x, y),
+                value,
+                fontname=font_name,
+                fontsize=size,
+                color=color,
+            )
+            run_width = 0.0
+            for item in value:
+                run_width += self._font_for_char(item, bold).text_length(item, fontsize=size)
+            return run_width
+
+        for char in text[1:]:
+            font_name = self._font_name_for_char(char, bold)
+            if font_name == run_font_name:
+                run += char
+                continue
+            cursor_x += flush(run, run_font_name, cursor_x)
+            run = char
+            run_font_name = font_name
+        flush(run, run_font_name, cursor_x)
+
+    def _ensure_space(self, needed: float) -> None:
+        if self.y + needed <= PDF_PAGE_HEIGHT - PDF_MARGIN_BOTTOM:
+            return
+        self._draw_footer()
+        self._new_page()
+
+    def _draw_footer(self) -> None:
+        footer = f"{self.title}  |  第 {self.page_no} 页"
+        self.page.draw_line(
+            (PDF_MARGIN_X, PDF_PAGE_HEIGHT - 34),
+            (PDF_PAGE_WIDTH - PDF_MARGIN_X, PDF_PAGE_HEIGHT - 34),
+            color=(0.86, 0.88, 0.91),
+            width=0.5,
+        )
+        self._insert_mixed_text(
+            PDF_MARGIN_X,
+            PDF_PAGE_HEIGHT - 18,
+            footer,
+            size=8.5,
+            bold=False,
+            color=(0.45, 0.49, 0.56),
+        )
+
+    def _wrap_line(self, text: str, max_width: float, size: float, bold: bool = False) -> List[str]:
+        text = _clean_report_text(text)
+        if not text:
+            return [""]
+        lines: List[str] = []
+        current = ""
+        for char in text:
+            candidate = current + char
+            if current and self._text_length(candidate, size, bold) > max_width:
+                lines.append(current)
+                current = char.lstrip()
+            else:
+                current = candidate
+        if current:
+            lines.append(current)
+        return lines or [text]
+
+    def add_spacer(self, height: float = 8) -> None:
+        self.y += height
+
+    def add_text(
+        self,
+        text: str,
+        *,
+        size: float = 10.2,
+        bold: bool = False,
+        color: Tuple[float, float, float] = (0.12, 0.16, 0.23),
+        indent: float = 0,
+        gap: float = 4,
+        line_height_ratio: float = 1.30,
+    ) -> None:
+        text = _clean_report_text(text)
+        if not text:
+            return
+        paragraphs = text.split("\n")
+        line_height = size * line_height_ratio
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                self.y += line_height * 0.6
+                continue
+            lines = self._wrap_line(paragraph, self.content_width - indent, size, bold)
+            self._ensure_space((len(lines) * line_height) + gap)
+            for line in lines:
+                self._insert_mixed_text(
+                    PDF_MARGIN_X + indent,
+                    self.y,
+                    line,
+                    size=size,
+                    bold=bold,
+                    color=color,
+                )
+                self.y += line_height
+            self.y += gap
+
+    def add_title(self, title: str, subtitle: str, meta_items: Sequence[Tuple[str, str]] = ()) -> None:
+        top = self.y
+        self.page.draw_rect(
+            self.fitz.Rect(PDF_MARGIN_X, top, PDF_MARGIN_X + 5, top + 58),
+            color=(0.05, 0.45, 0.30),
+            fill=(0.05, 0.45, 0.30),
+            width=0,
+        )
+        self._insert_mixed_text(
+            PDF_MARGIN_X + 24,
+            top + 36,
+            title,
+            size=22,
+            bold=True,
+            color=(0.04, 0.32, 0.21),
+        )
+        self._insert_mixed_text(
+            PDF_MARGIN_X + 24,
+            top + 58,
+            subtitle,
+            size=8.5,
+            bold=False,
+            color=(0.38, 0.46, 0.56),
+        )
+
+        meta_x = PDF_MARGIN_X + 290
+        meta_y = top + 24
+        for label, value in meta_items:
+            if not value:
+                continue
+            self._insert_mixed_text(
+                meta_x,
+                meta_y,
+                f"{label}：",
+                size=8.7,
+                bold=True,
+                color=(0.29, 0.36, 0.45),
+            )
+            self._insert_mixed_text(
+                meta_x + 54,
+                meta_y,
+                value,
+                size=8.7,
+                bold=False,
+                color=(0.16, 0.20, 0.28),
+            )
+            meta_y += 14
+
+        self.page.draw_line(
+            (PDF_MARGIN_X, top + 76),
+            (PDF_PAGE_WIDTH - PDF_MARGIN_X, top + 76),
+            color=(0.78, 0.86, 0.82),
+            width=0.8,
+        )
+        self.y = top + 84
+
+    def add_section(self, title: str) -> None:
+        self._ensure_space(64)
+        self.y += 7
+        self.page.draw_rect(
+            self.fitz.Rect(PDF_MARGIN_X, self.y - 13, PDF_MARGIN_X + 4, self.y + 5),
+            color=(0.06, 0.42, 0.28),
+            fill=(0.06, 0.42, 0.28),
+            width=0,
+        )
+        self._insert_mixed_text(
+            PDF_MARGIN_X + 12,
+            self.y,
+            title,
+            size=13,
+            bold=True,
+            color=(0.04, 0.34, 0.22),
+        )
+        self.page.draw_line(
+            (PDF_MARGIN_X + 104, self.y - 4),
+            (PDF_PAGE_WIDTH - PDF_MARGIN_X, self.y - 4),
+            color=(0.83, 0.88, 0.85),
+            width=0.5,
+        )
+        self.y += 10
+
+    def add_key_values(self, items: Sequence[Tuple[str, str]]) -> None:
+        for label, value in items:
+            if not value:
+                continue
+            self.add_text(f"{label}：{value}", size=10.1, gap=1)
+
+    def add_bullets(self, items: Sequence[str], *, indent: float = 12) -> None:
+        for item in items:
+            if item:
+                self.add_text(f"- {item}", size=9.9, indent=indent, gap=1)
+
+    def _notice_height(self, text: str) -> Tuple[List[str], float]:
+        lines = self._wrap_line(text, self.content_width - 24, 9.2, False)
+        line_height = 9.2 * 1.28
+        height = max(34, 18 + len(lines) * line_height)
+        return lines, height
+
+    def add_notice(self, text: str) -> None:
+        text = _clean_report_text(text)
+        if not text:
+            return
+        text = re.sub(r"^重要提示[:：]\s*", "", text)
+        lines, height = self._notice_height(text)
+        line_height = 9.2 * 1.28
+        self._ensure_space(height + 10)
+        top = self.y + 2
+        self.page.draw_rect(
+            self.fitz.Rect(PDF_MARGIN_X, top, PDF_PAGE_WIDTH - PDF_MARGIN_X, top + height),
+            color=(0.96, 0.84, 0.72),
+            fill=(1.0, 0.97, 0.92),
+            width=0.6,
+        )
+        self._insert_mixed_text(
+            PDF_MARGIN_X + 12,
+            top + 18,
+            "重要提示",
+            size=9.5,
+            bold=True,
+            color=(0.72, 0.31, 0.04),
+        )
+        text_y = top + 31
+        for line in lines:
+            self._insert_mixed_text(
+                PDF_MARGIN_X + 12,
+                text_y,
+                line,
+                size=9.2,
+                bold=False,
+                color=(0.72, 0.22, 0.03),
+            )
+            text_y += line_height
+        self.y = top + height + 10
+
+    def add_notice_section(self, title: str, text: str) -> None:
+        text = _clean_report_text(text)
+        if not text:
+            self.add_section(title)
+            return
+        text = re.sub(r"^重要提示[:：]\s*", "", text)
+        _, notice_height = self._notice_height(text)
+        self._ensure_space(32 + notice_height + 12)
+        self.add_section(title)
+        self.add_notice(text)
+
+    def finish(self) -> bytes:
+        self._draw_footer()
+        pdf_bytes = self.doc.tobytes(garbage=4, deflate=True)
+        self.doc.close()
+        return pdf_bytes
 
 
 def _stage_value(stage: Any) -> str:
@@ -128,6 +520,56 @@ def _get_session_state(session_id: str) -> Optional[SessionState]:
         logger.warning("Failed to get session from database: %s", exc)
     
     return None
+
+
+def _get_db_session(session_id: str):
+    if not session_id:
+        return None
+    try:
+        from apps.agents.models import ConsultationSession
+        return ConsultationSession.objects.filter(session_id=session_id).first()
+    except Exception as exc:
+        logger.warning("Failed to load session owner: %s", exc)
+        return None
+
+
+def _check_session_access(
+    request: Request,
+    session_id: str,
+    *,
+    bind_anonymous: bool = False,
+) -> tuple[Any, Optional[Response]]:
+    """Ensure the current caller can access a consultation session."""
+    db_session = _get_db_session(session_id)
+    if db_session is None:
+        return None, Response(
+            {"error": f"会话不存在: {session_id}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    owner_id = str(db_session.user_id or "").strip()
+    if owner_id:
+        if request.user.is_authenticated and owner_id == str(request.user.id):
+            return db_session, None
+        return None, Response(
+            {"error": "无权访问该问诊会话"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if bind_anonymous and request.user.is_authenticated:
+        db_session.user_id = str(request.user.id)
+        db_session.save(update_fields=["user_id"])
+
+    return db_session, None
+
+
+def _bind_session_to_request_user(session_id: str, request: Request) -> None:
+    if not session_id or not request.user.is_authenticated:
+        return
+    db_session = _get_db_session(session_id)
+    if db_session and not str(db_session.user_id or "").strip():
+        db_session.user_id = str(request.user.id)
+        db_session.save(update_fields=["user_id"])
 
 
 def _save_session_state(state: SessionState) -> None:
@@ -306,6 +748,22 @@ def send_message(request: Request) -> Response:
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    if session_id:
+        db_session = _get_db_session(session_id)
+        if db_session:
+            _, access_error = _check_session_access(
+                request,
+                session_id,
+                bind_anonymous=True,
+            )
+            if access_error:
+                return access_error
+        elif not create_if_not_exists:
+            return Response(
+                {"error": f"会话不存在: {session_id}"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
     # 获取或创建会话
     state = _get_session_state(session_id) if session_id else None
     if state is None:
@@ -329,6 +787,7 @@ def send_message(request: Request) -> Response:
     orchestrator = _get_or_create_orchestrator()
     try:
         state = orchestrator.process_message(state, user_message)
+        _bind_session_to_request_user(state.session_id, request)
     except Exception as exc:
         logger.error("Error processing message: %s", exc)
         return Response(
@@ -391,11 +850,16 @@ def send_message(request: Request) -> Response:
             }
             for chunk in state.reference_chunks[-5:]  # 只返回最近5个
         ] if state.reference_chunks else [],
-        # 调试信息
-        "debug_symptoms": [s.name for s in state.symptoms],
-        "debug_inquiry_answers": state.inquiry_answers,
-        "debug_chief_complaint": state.chief_complaint,
     }
+
+    if settings.DEBUG:
+        response_data.update(
+            {
+                "debug_symptoms": [s.name for s in state.symptoms],
+                "debug_inquiry_answers": state.inquiry_answers,
+                "debug_chief_complaint": state.chief_complaint,
+            }
+        )
 
     if failed_record is not None:
         error_msg = failed_record.error_msg or "模型调用失败"
@@ -479,10 +943,28 @@ def send_message_stream(request: Request) -> StreamingHttpResponse:
             error_gen(), content_type="text/event-stream"
         )
 
+    if session_id:
+        db_session = _get_db_session(session_id)
+        if db_session:
+            _, access_error = _check_session_access(
+                request,
+                session_id,
+                bind_anonymous=True,
+            )
+            if access_error:
+                message = str(access_error.data.get("error", "无权访问"))
+                def forbidden_gen():
+                    yield f"data: {json.dumps({'type': 'error', 'message': message}, ensure_ascii=False)}\n\n"
+                return StreamingHttpResponse(
+                    forbidden_gen(), content_type="text/event-stream", status=access_error.status_code
+                )
+
     state = _get_session_state(session_id) if session_id else None
     if state is None:
         orchestrator = _get_or_create_orchestrator()
         state = orchestrator.create_session(session_id=session_id)
+        _save_session_state(state)
+        _bind_session_to_request_user(state.session_id, request)
 
     orchestrator = _get_or_create_orchestrator()
 
@@ -529,6 +1011,17 @@ def upload_tongue_image(request: Request) -> Response:
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    if session_id:
+        db_session = _get_db_session(session_id)
+        if db_session:
+            _, access_error = _check_session_access(
+                request,
+                session_id,
+                bind_anonymous=True,
+            )
+            if access_error:
+                return access_error
+
     # 读取图片字节
     image_bytes = image_file.read()
     
@@ -551,6 +1044,8 @@ def upload_tongue_image(request: Request) -> Response:
         if state is None:
             orchestrator = _get_or_create_orchestrator()
             state = orchestrator.create_session(session_id=session_id)
+            _save_session_state(state)
+            _bind_session_to_request_user(state.session_id, request)
 
         state.has_image = True
 
@@ -597,6 +1092,14 @@ def upload_tongue_image(request: Request) -> Response:
 @permission_classes([AllowAny])
 def get_session(request: Request, session_id: str) -> Response:
     """获取会话当前状态"""
+    _, access_error = _check_session_access(
+        request,
+        session_id,
+        bind_anonymous=True,
+    )
+    if access_error:
+        return access_error
+
     state = _get_session_state(session_id)
     if state is None:
         return Response(
@@ -626,6 +1129,14 @@ def get_session(request: Request, session_id: str) -> Response:
 @permission_classes([AllowAny])
 def get_report(request: Request, session_id: str) -> Response:
     """获取问诊报告"""
+    _, access_error = _check_session_access(
+        request,
+        session_id,
+        bind_anonymous=True,
+    )
+    if access_error:
+        return access_error
+
     state = _get_session_state(session_id)
     if state is None:
         return Response(
@@ -710,10 +1221,226 @@ def get_report(request: Request, session_id: str) -> Response:
     )
 
 
+def _extract_recommendations_for_pdf(state: SessionState) -> List[Dict[str, str]]:
+    if state.recommendations:
+        return [
+            {
+                "category": r.category or "调理建议",
+                "content": r.content or "",
+                "rationale": r.rationale or "",
+                "caution": r.caution or "",
+            }
+            for r in state.recommendations
+            if r.content
+        ]
+
+    report_json = state.report_json or {}
+    json_recs = report_json.get("recommendations")
+    if isinstance(json_recs, list) and json_recs:
+        items: List[Dict[str, str]] = []
+        for rec in json_recs:
+            if isinstance(rec, dict):
+                items.append({
+                    "category": str(rec.get("category") or "调理建议"),
+                    "content": str(rec.get("content") or rec.get("text") or ""),
+                    "rationale": str(rec.get("rationale") or ""),
+                    "caution": str(rec.get("caution") or ""),
+                })
+            elif rec:
+                items.append({"category": "调理建议", "content": str(rec), "rationale": "", "caution": ""})
+        return [item for item in items if item["content"]]
+
+    summary = _clean_report_text(report_json.get("recommendations_summary"))
+    return [{"category": "调理建议", "content": summary, "rationale": "", "caution": ""}] if summary else []
+
+
+def _extract_references_for_pdf(state: SessionState) -> List[str]:
+    if state.reference_chunks:
+        return [
+            f"{chunk.source or '知识库'}：{chunk.content[:300]}"
+            for chunk in state.reference_chunks[:8]
+            if chunk.content
+        ]
+
+    report_json = state.report_json or {}
+    refs = report_json.get("references")
+    if isinstance(refs, list) and refs:
+        return [str(ref) for ref in refs if ref]
+
+    evidence = report_json.get("evidence_chain")
+    if isinstance(evidence, str) and evidence.strip():
+        return [evidence.strip()]
+    return []
+
+
+def _extract_symptoms_for_pdf(state: SessionState) -> List[str]:
+    symptoms = []
+    for symptom in state.symptoms:
+        detail_parts = [symptom.name]
+        if symptom.duration:
+            detail_parts.append(f"持续{symptom.duration}")
+        if symptom.severity:
+            detail_parts.append(f"程度{symptom.severity}")
+        symptoms.append("，".join(detail_parts))
+    return symptoms
+
+
+def _generate_report_pdf(state: SessionState) -> bytes:
+    report_json = state.report_json or {}
+    builder = _PdfReportBuilder("中医问诊报告")
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    section_no = 1
+    section_nums = "一二三四五六七八九十"
+
+    def add_numbered_section(title: str) -> None:
+        nonlocal section_no
+        prefix = section_nums[section_no - 1] if section_no <= len(section_nums) else str(section_no)
+        builder.add_section(f"{prefix}、{title}")
+        section_no += 1
+
+    builder.add_title("中医问诊报告", "AI COPILOT / TCM CONSULTATION REPORT", [
+        ("报告编号", state.session_id),
+        ("生成时间", generated_at),
+        ("报告性质", "健康参考建议与中医辨证参考"),
+    ])
+
+    add_numbered_section("基本信息")
+    patient_summary = _clean_report_text(report_json.get("patient_summary"))
+    profile = state.patient_profile
+    constitution = str(profile.constitution or "").replace("ConstitutionType.", "")
+    constitution = "" if constitution.upper() in {"UNKNOWN", "未知"} else constitution
+    basic_items = [
+        ("主诉", state.chief_complaint or report_json.get("chief_complaint") or ""),
+        ("患者摘要", patient_summary),
+        ("年龄段", profile.age_group or ""),
+        ("性别", profile.gender or ""),
+        ("体质", constitution),
+    ]
+    builder.add_key_values([(label, str(value)) for label, value in basic_items])
+
+    symptoms = _extract_symptoms_for_pdf(state)
+    if symptoms:
+        builder.add_text("主要症状：", bold=True, gap=1)
+        builder.add_bullets(symptoms)
+
+    observation_parts = [
+        state.observation.tongue_color and f"舌色：{state.observation.tongue_color}",
+        state.observation.tongue_coating and f"舌苔：{state.observation.tongue_coating}",
+        state.observation.coating_thickness and f"苔厚薄：{state.observation.coating_thickness}",
+        state.observation.coating_texture and f"苔质：{state.observation.coating_texture}",
+        state.observation.tongue_shape and f"舌形：{state.observation.tongue_shape}",
+        state.observation.face_color and f"面色：{state.observation.face_color}",
+    ]
+    observation_text = "；".join(part for part in observation_parts if part)
+    if observation_text:
+        builder.add_key_values([("望诊所见", observation_text)])
+
+    add_numbered_section("辨证结论")
+    conclusion = report_json.get("syndrome_conclusion") or report_json.get("syndrome_analysis") or {}
+    primary = state.primary_syndrome or (conclusion.get("primary_syndrome") if isinstance(conclusion, dict) else "")
+    if primary:
+        builder.add_text(f"主证型：{primary}", size=12, bold=True, color=(0.06, 0.29, 0.19), gap=3)
+    if state.syndrome_candidates:
+        for index, candidate in enumerate(state.syndrome_candidates, 1):
+            confidence = _format_pdf_percent(candidate.confidence)
+            prefix = "主证候" if index == 1 else f"候选证候 {index}"
+            builder.add_text(f"{prefix}：{candidate.name}" + (f"（置信度 {confidence}）" if confidence else ""), bold=index == 1, gap=1)
+            if candidate.supporting_symptoms:
+                builder.add_text("支持依据：" + "、".join(candidate.supporting_symptoms), indent=12, gap=1)
+            if candidate.reasoning:
+                builder.add_text("辨证推理：" + candidate.reasoning, indent=12, gap=2)
+    elif isinstance(conclusion, dict):
+        evidence = conclusion.get("evidence") or conclusion.get("supporting_symptoms") or []
+        confidence = _format_pdf_percent(conclusion.get("confidence"))
+        if confidence:
+            builder.add_key_values([("置信度", confidence)])
+        if isinstance(evidence, list):
+            builder.add_bullets([str(item) for item in evidence if item])
+
+    add_numbered_section("调理建议")
+    recommendations = _extract_recommendations_for_pdf(state)
+    if recommendations:
+        for index, rec in enumerate(recommendations, 1):
+            builder.add_text(f"{index}. {rec['category']}", bold=True, color=(0.06, 0.29, 0.19), gap=1)
+            builder.add_text(rec["content"], indent=12, gap=1)
+            if rec.get("rationale"):
+                builder.add_text(f"依据：{rec['rationale']}", indent=12, color=(0.40, 0.46, 0.54), gap=1)
+            if rec.get("caution"):
+                builder.add_text(f"注意：{rec['caution']}", indent=12, color=(0.72, 0.31, 0.04), gap=3)
+    else:
+        builder.add_text("暂无结构化调理建议。")
+
+    follow_up = _clean_report_text(report_json.get("follow_up_suggestions"))
+    if follow_up:
+        add_numbered_section("随访建议")
+        builder.add_text(follow_up)
+
+    references = _extract_references_for_pdf(state)
+    add_numbered_section("参考依据")
+    if references:
+        builder.add_bullets(references)
+    else:
+        builder.add_text("暂无可展示的知识库参考片段。")
+
+    final_section_no = section_no
+    final_prefix = section_nums[final_section_no - 1] if final_section_no <= len(section_nums) else str(final_section_no)
+    section_no += 1
+    disclaimer_text = (
+        state.disclaimer
+        or "本报告仅供健康参考与中医辨证参考，不构成医疗诊断，不能替代执业医师的专业诊疗。"
+    )
+    safety_texts: List[str] = []
+    if state.safety_result.safety_message:
+        safety_texts.append(state.safety_result.safety_message)
+    safety_notes = _clean_report_text(report_json.get("safety_notes"))
+    if safety_notes:
+        safety_texts.append(safety_notes)
+
+    builder.add_notice_section(f"{final_prefix}、安全提示与免责声明", "\n".join([*safety_texts, disclaimer_text]))
+
+    return builder.finish()
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def export_report_pdf(request: Request, session_id: str) -> HttpResponse:
+    """导出整理排版后的问诊报告 PDF"""
+    _, access_error = _check_session_access(
+        request,
+        session_id,
+        bind_anonymous=True,
+    )
+    if access_error:
+        message = str(access_error.data.get("error", "无权访问该问诊会话"))
+        return HttpResponse(message, status=access_error.status_code, content_type="text/plain; charset=utf-8")
+
+    state = _get_session_state(session_id)
+    if state is None:
+        return HttpResponse(f"会话不存在: {session_id}", status=404, content_type="text/plain; charset=utf-8")
+
+    if _stage_value(state.current_stage) != ConsultStage.DONE.value or not state.report_text:
+        return HttpResponse("报告尚未生成，请先完成完整问诊流程", status=400, content_type="text/plain; charset=utf-8")
+
+    try:
+        pdf_bytes = _generate_report_pdf(state)
+    except Exception as exc:
+        logger.exception("Failed to export report PDF: %s", exc)
+        return HttpResponse("PDF 导出失败", status=500, content_type="text/plain; charset=utf-8")
+
+    filename = f"TCM_Report_{state.session_id[:8]}.pdf"
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
 @api_view(["DELETE"])
 @permission_classes([AllowAny])
 def delete_session(request: Request, session_id: str) -> Response:
     """删除问诊会话（真实删除）"""
+    _, access_error = _check_session_access(request, session_id)
+    if access_error:
+        return access_error
+
     try:
         # 从数据库删除会话记录
         from apps.agents.models import ConsultationSession
@@ -923,7 +1650,11 @@ def wellness_checkin(request: Request) -> Response:
     sleep_q = int(request.data.get("sleep_quality", 3))
     mood = int(request.data.get("mood_score", 3))
     notes = request.data.get("notes", "")
-    user_id = request.data.get("user_id", "anonymous")
+    user_id = (
+        str(request.user.id)
+        if request.user.is_authenticated
+        else request.data.get("user_id", "anonymous")
+    )
 
     total = len(completed) + len(skipped)
     completion_rate = len(completed) / total if total > 0 else 0
@@ -975,17 +1706,20 @@ def list_user_reports(request: Request) -> Response:
                 "session_id": "...",
                 "chief_complaint": "头疼、失眠",
                 "primary_syndrome": "肝阳上亢证",
+                "consult_time": "2026-03-23T10:00:00",
                 "created_at": "2026-03-23T10:00:00",
+                "report_generated_at": "2026-03-23T10:30:00",
                 "summary": "..."
             }
         ]
     }
     """
     from apps.agents.models import ConsultationSession
-    # 获取所有完成的会话（包括已归档的）
+    owner_id = str(request.user.id) if request.user.is_authenticated else ""
     sessions = ConsultationSession.objects.filter(
         is_completed=True,
-    ).order_by('-updated_at')[:20]  # 最近20个（按完成时间）
+        user_id=owner_id,
+    ).order_by('-created_at')[:20]  # 最近20个（按问诊开始时间）
     
     reports = []
     for session in sessions:
@@ -999,7 +1733,12 @@ def list_user_reports(request: Request) -> Response:
                 state = None
 
         if state and (_stage_value(state.current_stage) == ConsultStage.DONE.value):
-            report_time = session.updated_at or session.created_at
+            consult_time = (
+                _to_local_datetime(getattr(state, "first_user_message_at", None))
+                or _to_local_datetime(getattr(state, "created_at", None))
+                or _to_local_datetime(session.created_at)
+            )
+            report_time = _to_local_datetime(session.updated_at) or consult_time
             primary_syndrome = state.primary_syndrome or "待辨证"
             chief = state.chief_complaint or "未记录"
             reports.append({
@@ -1007,10 +1746,12 @@ def list_user_reports(request: Request) -> Response:
                 "chief_complaint": chief,
                 "primary_syndrome": primary_syndrome,
                 "symptoms": [s.name for s in state.symptoms[:5]],
-                "created_at": session.created_at.isoformat(),
-                "updated_at": report_time.isoformat(),
+                "consult_time": consult_time.isoformat() if consult_time else "",
+                "created_at": consult_time.isoformat() if consult_time else session.created_at.isoformat(),
+                "report_generated_at": report_time.isoformat() if report_time else "",
+                "updated_at": report_time.isoformat() if report_time else "",
                 "summary": f"{chief[:30]} - {primary_syndrome}",
-                "date_label": report_time.strftime("%m-%d %H:%M"),
+                "date_label": consult_time.strftime("%m-%d %H:%M") if consult_time else "",
             })
     
     return Response({"reports": reports})

@@ -230,15 +230,7 @@ const fileAccept = computed(() => {
 })
 
 const canSend = computed(() => {
-  const result = (inputValue.value.trim() !== '' || fileAllList.value.length > 0) && !sending.value && !uploading.value
-  console.log('canSend computed:', {
-    inputValue: inputValue.value,
-    fileAllListLength: fileAllList.value.length,
-    sending: sending.value,
-    uploading: uploading.value,
-    result: result
-  })
-  return result
+  return (inputValue.value.trim() !== '' || fileAllList.value.length > 0) && !sending.value && !uploading.value
 })
 
 // 格式化时间
@@ -373,15 +365,7 @@ const handleFileUpload = async (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
     
-    console.log('Uploading file:', file.name)
-    console.log('FormData:', formData)
-    
     const response = await chatApi.uploadFile(formData)
-    
-    console.log('Upload response:', response)
-    console.log('Response keys:', Object.keys(response))
-    console.log('Response url:', response.url)
-    console.log('Response file_id:', response.file_id)
     
     // 更新文件状态
     const index = fileAllList.value.findIndex(item => item.id === fileItem.id)
@@ -392,7 +376,6 @@ const handleFileUpload = async (file: File) => {
         url: response.url,
         file_id: response.file_id
       }
-      console.log('Updated file item:', fileAllList.value[index])
     }
     
     ElMessage.success('文件上传成功')
@@ -417,15 +400,7 @@ const handleRemoveFile = (file: any, index: number) => {
 
 // 处理发送消息
 const handleSend = async () => {
-  console.log('handleSend called')
-  console.log('canSend.value:', canSend.value)
-  console.log('inputValue.value:', inputValue.value)
-  console.log('fileAllList.value:', fileAllList.value)
-  console.log('sending.value:', sending.value)
-  console.log('uploading.value:', uploading.value)
-  
   if (!canSend.value) {
-    console.log('Cannot send, canSend is false')
     return
   }
   
@@ -434,14 +409,8 @@ const handleSend = async () => {
   try {
     const message = inputValue.value.trim()
     const files = fileAllList.value.filter(file => !file.loading)
-    
-    console.log('message:', message)
-    console.log('files:', files)
-    console.log('files.length:', files.length)
-    console.log('files[0]:', files[0])
-    
+
     if (message || files.length > 0) {
-      console.log('Emitting send event with message:', message, 'and files:', files)
       emit('send', message, files)
       
       // 清空输入

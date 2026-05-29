@@ -1,6 +1,12 @@
 <template>
   <div class="auth-page">
-    <div class="auth-shell">
+    <div class="ambient-bg">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="noise-overlay"></div>
+    </div>
+    
+    <div class="auth-shell glass-card">
       <div class="auth-brand">
         <h2>{{ isRegister ? '创建您的健康账户' : '欢迎回来' }}</h2>
         <p>{{ isRegister ? '注册后自动登录，云端保存问诊与健康档案' : '登录后同步历史问诊、舌象分析和养生计划' }}</p>
@@ -190,7 +196,7 @@ onMounted(() => {
 })
 </script>
 
-<style>
+<style scoped>
 .auth-page {
   min-height: 100vh;
   display: flex;
@@ -198,35 +204,83 @@ onMounted(() => {
   align-items: center;
   position: relative;
   isolation: isolate;
-  background:
-    radial-gradient(circle at 12% 15%, rgba(61, 153, 121, 0.2), transparent 32%),
-    radial-gradient(circle at 88% 12%, rgba(67, 129, 179, 0.18), transparent 34%),
-    linear-gradient(135deg, #f7fcff 0%, #f0f8f2 100%);
+  background-color: #ffffff;
+  color: var(--tcm-text-primary);
   padding: 20px;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* 沉浸式流体背景 */
+.ambient-bg {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.4;
+  animation: float 20s infinite ease-in-out alternate;
+}
+
+.orb-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(20,184,166,0.3) 0%, rgba(0,0,0,0) 70%); }
+.orb-2 { bottom: -20%; right: -10%; width: 60vw; height: 60vw; background: radial-gradient(circle, rgba(139,92,246,0.2) 0%, rgba(0,0,0,0) 70%); animation-delay: -5s; }
+
+.noise-overlay {
+  position: absolute; inset: 0;
+  background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)" opacity="0.05"/%3E%3C/svg%3E');
+  mix-blend-mode: overlay;
+}
+
+@keyframes float {
+  0% { transform: scale(1) translate(0, 0); }
+  50% { transform: scale(1.1) translate(2%, 2%); }
+  100% { transform: scale(0.9) translate(-2%, -2%); }
 }
 
 .auth-shell {
+  position: relative;
+  z-index: 10;
   width: 100%;
   max-width: 420px;
-  border-radius: 18px;
-  border: 1px solid #dce9e1;
-  background: rgba(255, 255, 255, 0.93);
-  box-shadow: 0 20px 48px rgba(24, 54, 38, 0.12);
-  padding: 26px 24px 18px;
-  backdrop-filter: blur(10px);
+  border-radius: 32px;
+  background: color-mix(in srgb, var(--tcm-card-bg) 70%, transparent);
+  border: 1px solid var(--tcm-border-color);
+  box-shadow: 0 24px 64px color-mix(in srgb, var(--tcm-border-color) 40%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--tcm-text-primary) 5%, transparent);
+  padding: 48px 40px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.auth-shell:hover {
+  border-color: color-mix(in srgb, var(--tcm-border-color) 80%, transparent);
+  box-shadow: 0 24px 64px color-mix(in srgb, var(--tcm-border-color) 50%, transparent), 0 0 32px rgba(20, 184, 166, 0.15);
 }
 
 .auth-brand h2 {
   margin: 0;
-  color: #1e3227;
-  font-size: 26px;
+  color: var(--tcm-text-primary);
+  font-size: 32px;
+  font-weight: 700;
   line-height: 1.2;
+  background: linear-gradient(135deg, var(--tcm-text-primary) 0%, var(--tcm-accent-color) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
 .auth-brand p {
-  margin: 8px 0 18px;
-  color: #708679;
-  font-size: 13px;
+  margin: 12px 0 32px;
+  color: var(--tcm-text-regular);
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .helper-row {
@@ -234,42 +288,94 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 0 8px;
 }
 
 .action-btn {
   width: 100%;
-  height: 44px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #2f9776, #2a86a3);
+  height: 52px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, rgba(20,184,166,0.9), rgba(139,92,246,0.9));
   border: none;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(20, 184, 166, 0.4), 0 4px 12px rgba(139, 92, 246, 0.3);
 }
 
 .switch-btn {
   width: 100%;
+  height: 44px;
+  border-radius: 99px;
+  color: var(--tcm-text-regular);
+  border: 1px solid var(--tcm-border-color);
+  transition: all 0.3s;
 }
 
-.auth-form .el-form-item {
-  margin-bottom: 14px;
+.switch-btn:hover {
+  color: var(--tcm-text-primary);
+  border-color: var(--tcm-text-primary);
+  background: color-mix(in srgb, var(--tcm-text-primary) 5%, transparent);
 }
 
-.auth-form .el-input__wrapper {
-  border-radius: 10px;
-  box-shadow: 0 0 0 1px #d7e6dc inset;
+:deep(.auth-form .el-form-item) {
+  margin-bottom: 24px;
 }
 
-.auth-form .el-input__wrapper.is-focus {
-  box-shadow: 0 0 0 1px #56aa84 inset;
+:deep(.auth-form .el-input__wrapper) {
+  background: color-mix(in srgb, var(--tcm-text-primary) 4%, transparent);
+  border-radius: 99px;
+  padding: 0 24px;
+  box-shadow: none;
+  border: 1px solid var(--tcm-border-color);
+  transition: all 0.3s ease;
 }
 
-.auth-form .el-button + .el-button {
-  margin-left: 0;
+:deep(.auth-form .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.15);
+  border-color: rgba(20, 184, 166, 0.5);
+  background: color-mix(in srgb, var(--tcm-text-primary) 6%, transparent);
+}
+
+:deep(.auth-form .el-input__inner) {
+  color: var(--tcm-text-primary);
+  height: 48px;
+  font-size: 15px;
+}
+
+:deep(.auth-form .el-input__inner::placeholder) {
+  color: var(--tcm-text-regular);
+}
+
+:deep(.el-checkbox__label) {
+  color: var(--tcm-text-regular);
+}
+
+:deep(.el-checkbox__input.is-checked + .el-checkbox__label) {
+  color: var(--tcm-accent-color);
+}
+
+:deep(.el-checkbox__inner) {
+  background: color-mix(in srgb, var(--tcm-text-primary) 5%, transparent);
+  border: 1px solid var(--tcm-border-color);
+}
+
+:deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background: var(--tcm-accent-color);
+  border-color: var(--tcm-accent-color);
 }
 
 @media (max-width: 640px) {
   .auth-shell {
     max-width: 100%;
-    border-radius: 14px;
-    padding: 22px 16px 14px;
+    border-radius: 20px;
+    padding: 30px 20px;
   }
 }
 </style>

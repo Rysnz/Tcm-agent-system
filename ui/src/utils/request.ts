@@ -30,6 +30,12 @@ request.interceptors.response.use(
       const softLogoutPrefixes = ['/v2/consult/', '/auth/archives/']
       const shouldSoftLogout = softLogoutPrefixes.some(prefix => requestUrl.includes(prefix))
 
+      const responseData = error.response?.data
+      const errorMessage =
+        responseData && typeof responseData === 'object' && 'message' in responseData
+          ? String(responseData.message || '请求失败')
+          : (typeof responseData === 'string' && responseData.trim() ? responseData : '请求失败')
+
       switch (status) {
         case 401:
         case 403:
@@ -57,7 +63,7 @@ request.interceptors.response.use(
           ElMessage.error('服务器错误')
           break
         default:
-          ElMessage.error(error.response.data.message || '请求失败')
+          ElMessage.error(errorMessage)
       }
     } else {
       ElMessage.error('网络错误，请检查网络连接')

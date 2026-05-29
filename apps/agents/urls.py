@@ -8,6 +8,7 @@ urlpatterns = [
     path("image/", views.upload_tongue_image, name="agent-upload-image"),
     path("session/<str:session_id>/", views.get_session, name="agent-get-session"),
     path("session/<str:session_id>/report/", views.get_report, name="agent-get-report"),
+    path("session/<str:session_id>/report/pdf/", views.export_report_pdf, name="agent-export-report-pdf"),
     path("session/<str:session_id>/delete/", views.delete_session, name="agent-delete-session"),
     path("safety-check/", views.safety_check, name="agent-safety-check"),
     # 个性化养生管理

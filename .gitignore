@@ -68,3 +68,18 @@ ui/node_modules/
 ui/dist/
 ui/.vite/
 
+# Project specific - exclude from competition submission
+docs/
+视频准备材料/
+backup/
+competition.pdf
+
+# Root level utility/test scripts
+patch_style.py
+read_pdf.py
+replace_styles.py
+check_*.py
+test_*.py
+
+# Media uploads (user data)
+apps/media/

@@ -14,11 +14,11 @@ import logging
 import time
 import re
 from abc import ABC, abstractmethod
-from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Generator, List, Optional, Tuple
 from urllib.parse import urlparse, urlunparse
 
+from django.utils import timezone
 from pydantic import BaseModel
 
 from apps.agents.session_state import (
@@ -595,7 +595,7 @@ class BaseAgent(ABC):
         record = AgentCallRecord(
             agent_name=self.agent_name,
             stage=self.stage,
-            started_at=datetime.utcnow(),
+            started_at=timezone.now(),
             input_summary=state.chief_complaint[:100] if state.chief_complaint else "",
             step_note=f"正在调用：{self.agent_name}",
         )
@@ -605,7 +605,7 @@ class BaseAgent(ABC):
             try:
                 updated_state = self._execute(state, **kwargs)
                 record.success = True
-                record.finished_at = datetime.utcnow()
+                record.finished_at = timezone.now()
                 record.retry_count = attempt
                 if updated_state.recommendations:
                     record.output_summary = str(len(updated_state.recommendations)) + " recommendations"
@@ -624,7 +624,7 @@ class BaseAgent(ABC):
         logger.error("[%s] all retries exhausted: %s", self.agent_name, last_error)
         record.success = False
         record.error_msg = str(last_error)
-        record.finished_at = datetime.utcnow()
+        record.finished_at = timezone.now()
         record.retry_count = self.max_retries
 
         degraded_state = self._fallback(state)
@@ -769,11 +769,11 @@ class BaseAgent(ABC):
                 # 本地推理服务按 agent 收敛输出长度，避免 token 膨胀
                 if model_instance.provider in {"lmstudio", "ollama", "vllm", "xorbits"}:
                     local_caps = {
-                        "IntakeAgent": 1024,  # 增加到1024，确保JSON完整
-                        "InquiryAgent": 1024,
-                        "SyndromeAgent": 1024,
-                        "RecommendationAgent": 2048,  # 增加到2048，确保建议完整
-                        "ReportAgent": 2048,
+                        "IntakeAgent": 2048,  # 增加到2048，确保JSON完整
+                        "InquiryAgent": 2048,
+                        "SyndromeAgent": 2048,
+                        "RecommendationAgent": 4096,  # 增加到4096，确保建议完整
+                        "ReportAgent": 8192,
                     }
                     min_required = {
                         "IntakeAgent": 512,

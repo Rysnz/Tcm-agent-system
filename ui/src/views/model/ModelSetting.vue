@@ -86,13 +86,13 @@
               type="info"
               :closable="false"
               title="Agent模型分配"
-              description="为每个智能体独立指定调用的模型。未指定时，系统将使用全局默认模型。配置保存在本地浏览器中。"
+              description="为每个智能体独立指定调用的模型。未指定时，系统将使用全局默认模型。配置保存到后端并立即生效。"
               class="mb-16"
             />
-            <el-table :data="agentConfigList" border>
-              <el-table-column prop="label" label="智能体" width="180" />
-              <el-table-column prop="desc" label="职责说明" />
-              <el-table-column label="分配的模型" width="260">
+            <el-table :data="agentConfigList" border class="agent-config-table">
+              <el-table-column prop="label" label="智能体" min-width="150" />
+              <el-table-column prop="desc" label="职责说明" min-width="220" />
+              <el-table-column label="分配的模型" min-width="260">
                 <template #default="{ row }">
                   <el-select
                     v-model="agentModelMap[row.name]"
@@ -768,20 +768,95 @@ onMounted(() => {
 
 <style scoped>
 .model-setting {
-  padding: 20px;
-  background-color: #f5f7fa;
-  min-height: calc(100vh - 60px);
+  padding: 30px;
+  background: transparent;
+  min-height: calc(100vh - 70px);
+  color: var(--tcm-text-primary);
+  overflow: auto;
 }
 
 .page-title {
-  margin: 0 0 20px 0;
-  font-size: 20px;
+  margin: 0 0 24px 0;
+  font-size: 24px;
   font-weight: 600;
-  color: #303133;
+  background: linear-gradient(to right, var(--tcm-text-primary), var(--tcm-accent-color));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 0.5px;
 }
 
 .model-setting-card {
-  background-color: #fff;
+  background: color-mix(in srgb, var(--tcm-card-bg) 60%, transparent) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--tcm-border-color) !important;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+:deep(.el-tabs__item) {
+  color: var(--tcm-text-regular);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border: none !important;
+  border-radius: 99px;
+  margin: 0 4px;
+  height: 40px;
+  line-height: 40px;
+  padding: 0 24px !important;
+  font-weight: 500;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: #ffffff !important;
+  background: var(--tcm-accent-color);
+  font-weight: 600;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--tcm-accent-color) 30%, transparent);
+}
+
+:deep(.el-tabs__item:hover:not(.is-active)) {
+  color: var(--tcm-text-primary);
+  background: color-mix(in srgb, var(--tcm-text-primary) 5%, transparent);
+}
+
+:deep(.el-tabs--card > .el-tabs__header) {
+  border-bottom: none;
+  margin-bottom: 24px;
+}
+
+:deep(.el-tabs--card > .el-tabs__header .el-tabs__nav) {
+  border: none;
+  background: color-mix(in srgb, var(--tcm-text-primary) 3%, transparent);
+  border-radius: 99px;
+  padding: 6px;
+  display: inline-flex;
+  box-shadow: inset 0 2px 4px color-mix(in srgb, var(--tcm-text-primary) 5%, transparent);
+}
+
+:deep(.el-tabs--card > .el-tabs__header .el-tabs__item) {
+  border-left: none;
+  background: transparent;
+}
+
+:deep(.el-tabs--card > .el-tabs__header .el-tabs__item:first-child) {
+  border-left: none;
+}
+
+:deep(.el-tabs--card > .el-tabs__header .el-tabs__item.is-active) {
+  background: var(--tcm-accent-color);
+  border-bottom-color: transparent;
 }
 
 .model-list-container {
@@ -790,6 +865,21 @@ onMounted(() => {
 
 .model-card {
   margin-bottom: 16px;
+  background: color-mix(in srgb, var(--tcm-text-primary) 2%, transparent) !important;
+  border: 1px solid var(--tcm-border-color) !important;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.model-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+  border-color: color-mix(in srgb, var(--tcm-accent-color) 30%, transparent) !important;
+}
+
+:deep(.model-card .el-card__header) {
+  border-bottom: 1px solid var(--tcm-border-color);
+  padding: 16px 20px;
 }
 
 .model-card-header {
@@ -801,7 +891,7 @@ onMounted(() => {
 .model-card-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--tcm-text-primary);
 }
 
 .model-info {
@@ -812,22 +902,36 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   font-size: 14px;
 }
 
 .info-label {
-  color: #606266;
+  color: var(--tcm-text-regular);
 }
 
 .info-value {
-  color: #303133;
+  color: var(--tcm-text-primary);
   font-weight: 500;
 }
 
 .model-actions {
   display: flex;
   justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--tcm-border-color);
+}
+
+/* Switches */
+:deep(.el-switch__core) {
+  border-color: var(--tcm-border-color);
+  background-color: var(--tcm-border-color);
+}
+
+:deep(.el-switch.is-checked .el-switch__core) {
+  border-color: var(--tcm-accent-color);
+  background-color: var(--tcm-accent-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tcm-accent-color) 40%, transparent);
 }
 
 .param-setting-container {
@@ -837,7 +941,7 @@ onMounted(() => {
 .slider-value {
   margin-left: 10px;
   font-size: 14px;
-  color: #606266;
+  color: var(--tcm-text-primary);
 }
 
 .form-actions {
@@ -847,11 +951,19 @@ onMounted(() => {
   margin-top: 20px;
 }
 
-/* 动态表单样式 */
+/* Dynamic forms */
 .dynamic-form-section {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid #ebeef5;
+}
+
+:deep(.el-divider__text) {
+  background-color: var(--tcm-card-bg);
+  color: var(--tcm-text-regular);
+}
+
+:deep(.el-divider) {
+  border-top-color: var(--tcm-border-color);
 }
 
 .slider-container {
@@ -864,11 +976,33 @@ onMounted(() => {
   min-width: 60px;
   text-align: left;
   font-size: 14px;
-  color: #606266;
+  color: var(--tcm-text-primary);
 }
 
+/* Agent Config */
 .agent-config-container {
   padding: 20px;
+}
+
+/* Table overrides */
+:deep(.el-table) {
+  background-color: transparent !important;
+  --el-table-border-color: var(--tcm-border-color);
+  --el-table-header-bg-color: color-mix(in srgb, var(--tcm-text-primary) 3%, transparent);
+  --el-table-header-text-color: var(--tcm-text-regular);
+  --el-table-row-hover-bg-color: color-mix(in srgb, var(--tcm-accent-color) 8%, transparent);
+}
+
+:deep(.el-table th.el-table__cell),
+:deep(.el-table tr),
+:deep(.el-table td.el-table__cell) {
+  background-color: transparent !important;
+  border-bottom: 1px solid var(--tcm-border-color) !important;
+  color: var(--tcm-text-primary);
+}
+
+:deep(.el-table::before) {
+  display: none;
 }
 
 .agent-config-tip {
@@ -876,8 +1010,8 @@ onMounted(() => {
   align-items: flex-start;
   gap: 6px;
   margin-top: 16px;
-  font-size: 12px;
-  color: #909399;
+  font-size: 13px;
+  color: var(--tcm-text-regular);
   line-height: 1.6;
 }
 
@@ -886,6 +1020,57 @@ onMounted(() => {
 .custom-model-tip {
   margin-top: 6px;
   font-size: 12px;
-  color: #7b8f84;
+  color: var(--tcm-accent-color);
+}
+
+/* Dialog overrides via :deep */
+:deep(.el-dialog) {
+  background: var(--tcm-card-bg) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--tcm-border-color);
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+:deep(.el-dialog__title) {
+  color: var(--tcm-text-primary);
+  font-weight: 600;
+}
+
+:deep(.el-dialog__header) {
+  border-bottom: 1px solid var(--tcm-border-color);
+  margin-right: 0;
+  padding-bottom: 16px;
+}
+
+:deep(.el-dialog__footer) {
+  border-top: 1px solid var(--tcm-border-color);
+  padding-top: 16px;
+}
+
+:deep(.el-form-item__label) {
+  color: var(--tcm-text-primary);
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper),
+:deep(.el-input-number) {
+  background-color: color-mix(in srgb, var(--tcm-text-primary) 3%, transparent);
+  box-shadow: 0 0 0 1px var(--tcm-border-color) inset;
+}
+
+:deep(.el-input__inner) {
+  color: var(--tcm-text-primary);
+}
+
+:deep(.el-alert) {
+  background-color: color-mix(in srgb, var(--tcm-accent-color) 10%, transparent);
+  color: var(--tcm-accent-color);
+  border: 1px solid color-mix(in srgb, var(--tcm-accent-color) 20%, transparent);
+}
+
+:deep(.el-alert__title),
+:deep(.el-alert__description) {
+  color: var(--tcm-text-primary);
 }
 </style>

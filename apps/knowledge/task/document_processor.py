@@ -14,18 +14,18 @@ class DocumentProcessor:
     
     def __init__(self, knowledge_base_id: str):
         self.knowledge_base_id = knowledge_base_id
-        # 获取知识库配置的向量模型，默认为shibing624/text2vec-base-chinese
+        # 获取知识库配置的向量模型，默认为bge-m3
         try:
             kb = KnowledgeBase.objects.get(id=knowledge_base_id)
             if hasattr(kb, 'embedding_model') and kb.embedding_model:
                 self.embedding_model = kb.embedding_model
-                self.dimension = getattr(kb, 'embedding_dimension', 768)  # shibing624/text2vec-base-chinese的维度是768
+                self.dimension = getattr(kb, 'embedding_dimension', 1024)  # bge-m3的维度是1024
             else:
-                self.embedding_model = 'shibing624/text2vec-base-chinese'
-                self.dimension = 768
+                self.embedding_model = 'bge-m3'
+                self.dimension = 1024
         except KnowledgeBase.DoesNotExist:
-            self.embedding_model = 'shibing624/text2vec-base-chinese'
-            self.dimension = 768
+            self.embedding_model = 'bge-m3'
+            self.dimension = 1024
         
         self.vector_store = PGVectorStore({
             'knowledge_base_id': knowledge_base_id,

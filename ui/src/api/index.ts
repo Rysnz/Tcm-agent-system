@@ -152,8 +152,9 @@ interface PaginatedResponse<T> {
 export const applicationApi = {
   getApplications: async () => {
     const response = await request.get<{count: number; next: string | null; previous: string | null; results: any[]}>('/application/')
+    const applicationList = Array.isArray(response?.results) ? response.results : []
     // 解析返回结果中的JSON字段
-    return response.results.map(app => {
+    return applicationList.map(app => {
       let parsedModelConfig = {};
       let parsedWorkFlow = {};
       let parsedTools: string[] = [];
@@ -497,6 +498,24 @@ export const consultApi = {
   getReport: (sessionId: string): Promise<{ session_id: string; report_text: string; report_json: any; disclaimer: string }> =>
     request.get(`/v2/consult/session/${sessionId}/report/`),
 
+  /** 导出整理排版后的问诊报告 PDF */
+  exportReportPdf: async (sessionId: string): Promise<Blob> => {
+    const token = localStorage.getItem('token')
+    const response = await fetch(`/api/v2/consult/session/${encodeURIComponent(sessionId)}/report/pdf/`, {
+      method: 'GET',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+
+    if (!response.ok) {
+      const message = await response.text()
+      throw new Error(message || `PDF导出失败: ${response.status}`)
+    }
+
+    return response.blob()
+  },
+
   /** 删除会话 */
   deleteSession: (sessionId: string): Promise<{ message: string; session_id: string }> =>
     request.delete(`/v2/consult/session/${sessionId}/delete/`),
@@ -521,7 +540,7 @@ export const consultApi = {
   }) => request.post('/v2/consult/wellness/checkin/', data),
 
   /** 获取用户问诊报告列表 */
-  getWellnessReports: (): Promise<{ reports: Array<{ session_id: string; chief_complaint: string; primary_syndrome: string; symptoms: string[]; created_at: string; summary: string }> }> =>
+  getWellnessReports: (): Promise<{ reports: Array<{ session_id: string; chief_complaint: string; primary_syndrome: string; symptoms: string[]; created_at: string; consult_time?: string; report_generated_at?: string; updated_at?: string; date_label?: string; summary: string }> }> =>
     request.get('/v2/consult/wellness/reports/'),
 }
 
@@ -601,11 +620,20 @@ export interface ModelListItem {
 
 // 统计数据类型定义
 export interface StatsData {
-  userCount: number;
+  userCount?: number;
+  registeredUserCount?: number;
+  activeUserCount?: number;
+  sessionCount?: number;
+  completedSessionCount?: number;
+  reportCount?: number;
+  highRiskCount?: number;
   questionCount: number;
   tokensCount: number;
   satisfactionRate?: number;
-  registeredUserCount?: number;
+  agentCallCount?: number;
+  agentSuccessRate?: number;
+  avgAgentDurationMs?: number;
+  avgQuestionsPerSession?: number;
 }
 
 // 图表数据类型定义
@@ -621,6 +649,14 @@ export interface ChartItem {
 export interface StatsResponse {
   stats: StatsData;
   charts: ChartItem[];
+  monitor?: {
+    generatedAt: string;
+    range: { start: string; end: string; label: string };
+    stageDistribution: Array<{ stage: string; label: string; count: number; percent: number }>;
+    syndromeDistribution: Array<{ name: string; count: number; percent: number }>;
+    agentPerformance: Array<{ agent: string; total: number; success: number; failed: number; successRate: number; avgDurationMs: number }>;
+    recentErrors: Array<{ agent: string; stage: string; message: string; time: string }>;
+  };
 }
 
 // 参数表单配置

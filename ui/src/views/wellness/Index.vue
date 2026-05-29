@@ -1,18 +1,18 @@
 <template>
-  <div class="wellness-page">
+  <div class="wellness-page bento-layout">
     <!-- 页面头 -->
-    <div class="page-header">
-      <h2 class="page-title">
+    <div class="page-header bento-header">
+      <h2 class="page-title gradient-text">
         <el-icon><Sunny /></el-icon>
         个性化养生管理
       </h2>
-      <el-button type="primary" @click="dialogVisible = true" :icon="Plus">
+      <el-button type="primary" class="round-btn glass-btn" @click="dialogVisible = true" :icon="Plus">
         生成新计划
       </el-button>
     </div>
 
     <!-- 体质选择对话框 -->
-    <el-dialog v-model="dialogVisible" title="生成养生计划" width="560px" :close-on-click-modal="false">
+    <el-dialog v-model="dialogVisible" title="生成养生计划" width="560px" :close-on-click-modal="false" class="glass-dialog">
       <el-form :model="planForm" label-width="100px">
         <el-form-item label="参考问诊报告">
           <el-select 
@@ -25,11 +25,11 @@
             <el-option
               v-for="r in userReports"
               :key="r.session_id"
-              :label="r.date_label + ' - ' + r.primary_syndrome"
+              :label="formatReportOptionLabel(r)"
               :value="r.session_id"
             >
               <div class="report-option">
-                <span class="report-date">{{ r.date_label }}</span>
+                <span class="report-date">{{ formatReportDate(r) }}</span>
                 <span class="report-syndrome">{{ r.primary_syndrome }}</span>
                 <span class="report-complaint">{{ r.chief_complaint }}</span>
               </div>
@@ -53,19 +53,19 @@
         </el-form-item>
         <el-form-item label="计划周期">
           <el-radio-group v-model="planForm.cycle_days">
-            <el-radio :label="7">7天</el-radio>
-            <el-radio :label="14">14天</el-radio>
+            <el-radio :value="7">7天</el-radio>
+            <el-radio :value="14">14天</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="generating" @click="generatePlan">生成计划</el-button>
+        <el-button @click="dialogVisible = false" class="round-btn">取消</el-button>
+        <el-button type="primary" class="round-btn" :loading="generating" @click="generatePlan">生成计划</el-button>
       </template>
     </el-dialog>
 
     <!-- 计划编辑对话框 -->
-    <el-dialog v-model="editDialogVisible" title="编辑微调养生计划" width="700px" :close-on-click-modal="false">
+    <el-dialog v-model="editDialogVisible" title="编辑微调养生计划" width="700px" :close-on-click-modal="false" class="glass-dialog">
       <el-form :model="editForm" label-width="100px" v-if="editForm">
         <el-form-item label="本周主题">
           <el-input v-model="editForm.theme" placeholder="请输入本周主题" />
@@ -79,6 +79,7 @@
               @close="removePrinciple(idx)"
               type="success"
               effect="light"
+              class="bento-tag-sm"
             >{{ p }}</el-tag>
             <el-input
               v-if="newPrincipleVisible"
@@ -89,7 +90,7 @@
               @keyup.enter="addPrinciple"
               @blur="addPrinciple"
             />
-            <el-button v-else size="small" @click="showNewPrincipleInput">+ 添加原则</el-button>
+            <el-button v-else size="small" @click="showNewPrincipleInput" class="round-btn-sm">+ 添加原则</el-button>
           </div>
         </el-form-item>
         <el-form-item label="周备注">
@@ -142,20 +143,20 @@
         </template>
       </el-form>
       <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveEditedPlan">保存修改</el-button>
+        <el-button @click="editDialogVisible = false" class="round-btn">取消</el-button>
+        <el-button type="primary" class="round-btn" @click="saveEditedPlan">保存修改</el-button>
       </template>
     </el-dialog>
 
     <!-- 当前计划 -->
-    <div v-if="currentPlan" class="plan-content">
+    <div v-if="currentPlan" class="modern-bento-grid">
       <!-- 计划摘要 -->
-      <el-card class="plan-summary" shadow="never">
+      <div class="bento-tile plan-summary-tile col-span-12">
         <div class="summary-header">
           <div class="summary-left">
-            <el-tag type="primary" size="large" effect="plain">
+            <div class="constitution-badge">
               {{ currentPlan.constitution }}
-            </el-tag>
+            </div>
             <div class="summary-dates">
               <el-icon><Calendar /></el-icon>
               {{ currentPlan.start_date }} ~ {{ currentPlan.end_date }}
@@ -166,7 +167,7 @@
               <div class="theme-label">本周主题</div>
               <div class="theme-text">{{ currentPlan.theme }}</div>
             </div>
-            <el-button type="primary" plain size="small" @click="openEditDialog">
+            <el-button type="primary" plain class="round-btn action-btn" @click="openEditDialog">
               <el-icon><Edit /></el-icon>
               编辑微调
             </el-button>
@@ -175,26 +176,25 @@
         <div class="key-principles">
           <div class="principles-title">核心原则</div>
           <div class="principles-tags">
-            <el-tag
+            <span
               v-for="p in currentPlan.key_principles"
               :key="p"
-              type="success"
-              effect="light"
-            >{{ p }}</el-tag>
+              class="principle-pill"
+            >{{ p }}</span>
           </div>
         </div>
-      </el-card>
+      </div>
 
       <!-- 每日计划（时间轴） -->
-      <el-card shadow="never" class="daily-plans-card">
-        <template #header>
-          <div class="card-title">
+      <div class="bento-tile daily-plans-tile col-span-12 lg-col-span-8">
+        <div class="bento-tile-header">
+          <div class="card-title gradient-title">
             <el-icon><Clock /></el-icon>
             每日计划
           </div>
-        </template>
+        </div>
 
-        <el-scrollbar>
+        <el-scrollbar class="days-nav-scrollbar">
           <div class="days-nav">
             <div
               v-for="day in currentPlan.daily_plans"
@@ -204,15 +204,15 @@
               @click="selectedDay = day.date"
             >
               <div class="day-label">{{ formatDayLabel(day.date) }}</div>
-              <el-icon v-if="checkedDays.has(day.date)" class="day-check"><CircleCheckFilled /></el-icon>
+              <div class="day-indicator" v-if="checkedDays.has(day.date)"></div>
             </div>
           </div>
         </el-scrollbar>
 
         <!-- 当日详情 -->
         <div v-if="todayPlan" class="day-detail">
-          <div class="detail-grid">
-            <div class="detail-item" v-for="item in todayItems" :key="item.icon">
+          <div class="detail-masonry">
+            <div class="masonry-item" v-for="item in todayItems" :key="item.icon">
               <div class="detail-icon">{{ item.icon }}</div>
               <div class="detail-body">
                 <div class="detail-label">{{ item.label }}</div>
@@ -221,89 +221,102 @@
             </div>
           </div>
 
-          <!-- 穴位保健 -->
-          <div v-if="todayPlan.acupoint_care" class="acupoint-section">
-            <div class="section-title">💆 穴位保健</div>
-            <p>{{ todayPlan.acupoint_care }}</p>
-          </div>
+          <div class="extra-cares-grid">
+            <!-- 穴位保健 -->
+            <div v-if="todayPlan.acupoint_care" class="care-tile">
+              <div class="section-title">💆 穴位保健</div>
+              <p>{{ todayPlan.acupoint_care }}</p>
+            </div>
 
-          <!-- 代茶饮 -->
-          <div v-if="todayPlan.tea_recommendation" class="tea-section">
-            <div class="section-title">🍵 代茶饮</div>
-            <p>{{ todayPlan.tea_recommendation }}</p>
-            <el-alert
-              type="warning"
-              :closable="false"
-              title="请在执业中医师指导下使用"
-              size="small"
-            />
-          </div>
-
-          <!-- 打卡清单 -->
-          <div class="checklist-section">
-            <div class="section-title">今日打卡清单</div>
-            <div class="checklist">
-              <div
-                v-for="item in todayPlan.checklist"
-                :key="item"
-                class="checklist-item"
-                :class="{ checked: checklistState[selectedDay + ':' + item] }"
-                @click="toggleChecklistItem(item)"
-              >
-                {{ item }}
+            <!-- 代茶饮 -->
+            <div v-if="todayPlan.tea_recommendation" class="care-tile">
+              <div class="section-title">🍵 代茶饮</div>
+              <p>{{ todayPlan.tea_recommendation }}</p>
+              <div class="bento-warning-alert">
+                <el-icon><Warning /></el-icon>
+                请在执业中医师指导下使用
               </div>
             </div>
-            <el-button
-              type="success"
-              class="checkin-btn"
-              @click="submitCheckin"
-              :loading="checkingIn"
-            >
-              <el-icon><Check /></el-icon>
-              提交打卡
-            </el-button>
           </div>
         </div>
-      </el-card>
+      </div>
 
-      <!-- 周备注 -->
-      <el-card shadow="never" class="weekly-notes-card">
-        <template #header>
-          <div class="card-title"><el-icon><Memo /></el-icon> 本周备注</div>
-        </template>
-        <p class="weekly-notes-text">{{ currentPlan.weekly_notes }}</p>
-        <el-alert
-          type="info"
-          :closable="false"
-          title="免责声明：以上建议仅供健康参考，不构成医疗建议。如有不适请及时就医。"
-        />
-      </el-card>
+      <!-- 侧边栏：打卡清单 & 周备注 -->
+      <div class="side-col col-span-12 lg-col-span-4">
+        <!-- 打卡清单 -->
+        <div v-if="todayPlan" class="bento-tile checklist-tile">
+          <div class="section-title">今日打卡</div>
+          <div class="checklist">
+            <div
+              v-for="item in todayPlan.checklist"
+              :key="item"
+              class="checklist-item"
+              :class="{ checked: checklistState[selectedDay + ':' + item] }"
+              @click="toggleChecklistItem(item)"
+            >
+              <div class="check-circle"></div>
+              <span class="check-text">{{ item }}</span>
+            </div>
+          </div>
+          <el-button
+            class="checkin-btn"
+            @click="submitCheckin"
+            :loading="checkingIn"
+            :class="{ 'btn-completed': todayPlan.checklist.every(item => checklistState[selectedDay + ':' + item]) }"
+          >
+            <el-icon><Check /></el-icon>
+            提交打卡
+          </el-button>
+        </div>
+
+        <!-- 周备注 -->
+        <div class="bento-tile weekly-notes-tile">
+          <div class="bento-tile-header">
+            <div class="card-title"><el-icon><Memo /></el-icon> 本周备注</div>
+          </div>
+          <p class="weekly-notes-text">{{ currentPlan.weekly_notes }}</p>
+          <div class="bento-info-alert">
+            免责声明：以上建议仅供健康参考，不构成医疗建议。如有不适请及时就医。
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 无计划时的引导 -->
-    <div v-else class="empty-state">
-      <el-empty description="暂无养生计划">
-        <template #image>
+    <div v-else class="empty-state modern-bento-grid">
+      <div class="bento-tile col-span-12 empty-bento">
+        <div class="empty-content">
           <div class="empty-illustration">🌿</div>
-        </template>
-        <el-button type="primary" @click="dialogVisible = true">生成我的养生计划</el-button>
-      </el-empty>
+          <h3>暂无养生计划</h3>
+          <p>生成专属您的个性化体质调理方案</p>
+          <el-button type="primary" class="round-btn generate-btn" @click="dialogVisible = true">生成我的养生计划</el-button>
+        </div>
+      </div>
 
-      <!-- 体质介绍 -->
-      <el-card shadow="never" class="constitution-intro">
-        <template #header>
-          <span class="card-title">九种体质说明</span>
-        </template>
-        <el-row :gutter="12">
-          <el-col :xs="12" :sm="8" :md="6" v-for="c in constitutions" :key="c.value">
-            <div class="constitution-card" @click="quickGenerate(c.value)">
-              <div class="const-emoji">{{ c.emoji }}</div>
+      <!-- 9种体质 不对称网格便当盒 -->
+      <div class="col-span-12 constitution-intro-section">
+        <h3 class="section-heading">九种体质说明</h3>
+        <div class="asymmetrical-bento-grid">
+          <div 
+            class="constitution-tile" 
+            v-for="(c, index) in constitutions" 
+            :key="c.value" 
+            @click="quickGenerate(c.value)"
+            :class="'tile-style-' + (index % 4)"
+          >
+            <div class="tile-top">
+              <span class="const-emoji">{{ c.emoji }}</span>
+              <div class="action-icon">
+                <el-icon><ArrowRight /></el-icon>
+              </div>
+            </div>
+            <div class="tile-bottom">
               <div class="const-name">{{ c.label }}</div>
               <div class="const-desc">{{ c.desc }}</div>
             </div>
-          </el-col>
-        </el-row>
-      </el-card>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -313,7 +326,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  Sunny, Plus, Calendar, Clock, CircleCheckFilled, Check, Memo, Edit, InfoFilled
+  Sunny, Plus, Calendar, Clock, CircleCheckFilled, Check, Memo, Edit, InfoFilled, ArrowRight, Warning
 } from '@element-plus/icons-vue'
 import { consultApi, authApi, type WellnessPlan } from '@/api'
 import dayjs from 'dayjs'
@@ -361,7 +374,19 @@ const selectedDay = ref('')
 const checkedDays = ref<Set<string>>(new Set())
 const checklistState = ref<Record<string, boolean>>({})
 const isLoggedIn = ref(!!localStorage.getItem('token'))
-const userReports = ref<Array<{ session_id: string; chief_complaint: string; primary_syndrome: string; symptoms: string[]; created_at: string; summary: string }>>([])
+type UserReport = {
+  session_id: string
+  chief_complaint: string
+  primary_syndrome: string
+  symptoms: string[]
+  created_at: string
+  consult_time?: string
+  report_generated_at?: string
+  updated_at?: string
+  date_label?: string
+  summary: string
+}
+const userReports = ref<UserReport[]>([])
 const recommendedConstitution = ref('')  // 推荐的体质类型
 
 // 编辑功能相关
@@ -400,6 +425,17 @@ const formatDayLabel = (dateStr: string) => {
   const today = dayjs().format('YYYY-MM-DD')
   if (dateStr === today) return '今天'
   return d.format('MM/DD')
+}
+
+const formatReportDate = (report: UserReport) => {
+  if (report.date_label) return report.date_label
+  const time = report.consult_time || report.created_at
+  const parsed = dayjs(time)
+  return parsed.isValid() ? parsed.format('MM-DD HH:mm') : '时间未知'
+}
+
+const formatReportOptionLabel = (report: UserReport) => {
+  return `${formatReportDate(report)} - ${report.primary_syndrome}`
 }
 
 const PLAN_STORAGE_KEY = `tcm_wellness_plan_${getCurrentUserId()}`
@@ -727,297 +763,451 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-$border-color: #e8eaf0;
-$primary: #1677ff;
-
 .wellness-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f7fcff 0%, #f4fbf6 100%);
-  padding: 24px;
+  background: var(--tcm-bg-color);
+  padding: 30px;
+  color: var(--tcm-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.page-header {
+.bento-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.gradient-text {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--tcm-text-primary) 0%, var(--tcm-accent-color) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
+  gap: 12px;
+}
 
-  .page-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0;
-    font-size: 20px;
-    color: #1a1a2e;
+.gradient-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--tcm-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.glass-btn {
+  background: color-mix(in srgb, var(--tcm-accent-color) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tcm-accent-color) 30%, transparent);
+  color: var(--tcm-accent-color);
+  backdrop-filter: blur(10px);
+  &:hover {
+    background: var(--tcm-accent-color);
+    color: var(--tcm-bg-color);
+    transform: scale(1.05);
+    box-shadow: 0 10px 20px var(--tcm-shadow);
   }
 }
 
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 15px;
+.round-btn {
+  border-radius: 20px;
+  padding: 10px 24px;
   font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+/* ─── 统一 Bento Tile 基础 ─────────────────────────────────── */
+.modern-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+}
+
+.col-span-12 { grid-column: span 12; }
+.lg-col-span-8 { @media (min-width: 1024px) { grid-column: span 8; } }
+.lg-col-span-4 { @media (min-width: 1024px) { grid-column: span 4; } }
+
+.bento-tile {
+  background: var(--tcm-card-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 32px;
+  border: 1px solid var(--tcm-border-color);
+  box-shadow: 0 20px 40px var(--tcm-shadow), inset 0 1px 0 var(--tcm-border-color);
+  padding: 32px;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 30px 60px var(--tcm-shadow), inset 0 1px 0 var(--tcm-border-color);
+    border-color: var(--tcm-border-color);
+  }
+}
+
+.bento-tile-header {
+  margin-bottom: 24px;
+  .card-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--tcm-text-primary);
+  }
 }
 
 /* ─── Plan summary ─────────────────────────────────── */
-.plan-summary {
-  border-radius: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #ddebe1;
-
+.plan-summary-tile {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tcm-accent-color) 10%, transparent), var(--tcm-card-bg));
+  
   .summary-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
+    align-items: flex-start;
+    margin-bottom: 24px;
 
     .summary-left {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 16px;
+
+      .constitution-badge {
+        display: inline-block;
+        background: color-mix(in srgb, var(--tcm-accent-color) 20%, transparent);
+        color: var(--tcm-accent-color);
+        border: 1px solid color-mix(in srgb, var(--tcm-accent-color) 30%, transparent);
+        padding: 8px 20px;
+        border-radius: 20px;
+        font-size: 18px;
+        font-weight: 700;
+        width: fit-content;
+      }
 
       .summary-dates {
         display: flex;
         align-items: center;
-        gap: 6px;
-        font-size: 13px;
-        color: #666;
+        gap: 8px;
+        font-size: 15px;
+        color: var(--tcm-text-regular);
+        font-weight: 500;
       }
     }
 
-    .summary-theme {
-      text-align: right;
-
-      .theme-label { font-size: 12px; color: #888; margin-bottom: 4px; }
-      .theme-text { font-size: 16px; font-weight: 600; color: $primary; }
+    .summary-right {
+      display: flex;
+      align-items: flex-end;
+      gap: 32px;
+      .summary-theme {
+        text-align: right;
+        .theme-label { font-size: 14px; color: var(--tcm-text-regular); margin-bottom: 8px; font-weight: 600; }
+        .theme-text { font-size: 28px; font-weight: 800; color: var(--tcm-text-primary); }
+      }
+      .action-btn {
+        background: var(--tcm-page-bg); border: 1px solid var(--tcm-border-color); color: var(--tcm-text-primary);
+        &:hover { background: var(--tcm-border-color); transform: scale(1.05); }
+      }
     }
   }
 
   .key-principles {
-    .principles-title { font-size: 13px; color: #666; margin-bottom: 8px; }
-    .principles-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .principles-title { font-size: 15px; color: var(--tcm-text-regular); margin-bottom: 12px; font-weight: 600; }
+    .principles-tags { 
+      display: flex; flex-wrap: wrap; gap: 12px; 
+      .principle-pill {
+        background: var(--tcm-page-bg);
+        border: 1px solid var(--tcm-border-color);
+        padding: 6px 16px;
+        border-radius: 16px;
+        font-size: 14px;
+        color: var(--tcm-text-regular);
+        font-weight: 500;
+      }
+    }
   }
 }
 
 /* ─── Daily plans ──────────────────────────────────── */
-.daily-plans-card {
-  border-radius: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #ddebe1;
+.daily-plans-tile {
+  min-height: 500px;
+}
 
+.days-nav-scrollbar {
+  margin: 0 -32px 24px -32px;
+  padding: 0 32px;
+  
   .days-nav {
     display: flex;
-    gap: 8px;
-    padding: 4px 0 12px;
-
+    gap: 16px;
+    padding-bottom: 16px;
+    
     .day-tab {
+      position: relative;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 4px;
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid $border-color;
+      justify-content: center;
+      padding: 12px 24px;
+      border-radius: 24px;
+      background: var(--tcm-page-bg);
+      border: 1px solid var(--tcm-border-color);
       cursor: pointer;
       white-space: nowrap;
-      transition: all 0.2s;
+      transition: all 0.3s;
+      color: var(--tcm-text-regular);
+      font-weight: 600;
 
-      &:hover { border-color: #2f9776; color: #2f9776; }
-      &.active { background: linear-gradient(135deg, #2f9776, #2b84a2); color: #fff; border-color: #2f9776; }
-      &.checked { border-color: #52c41a; }
+      &:hover { background: var(--tcm-border-color); transform: translateY(-2px); }
+      &.active { background: var(--tcm-accent-color); color: var(--tcm-bg-color); box-shadow: 0 10px 20px var(--tcm-shadow); border-color: var(--tcm-accent-color); }
+      &.checked .day-label { color: var(--tcm-accent-color); }
+      &.active.checked .day-label { color: var(--tcm-bg-color); }
 
-      .day-label { font-size: 12px; }
-      .day-check { color: #52c41a; font-size: 14px; }
-    }
-  }
-
-  .day-detail {
-    .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 12px;
-      margin-bottom: 16px;
-
-      .detail-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 10px;
-        padding: 12px;
-        background: #fafafa;
-        border-radius: 8px;
-        border: 1px solid $border-color;
-
-        .detail-icon { font-size: 20px; flex-shrink: 0; }
-        .detail-label { font-size: 12px; color: #888; margin-bottom: 4px; }
-        .detail-value { font-size: 13px; color: #333; line-height: 1.5; }
+      .day-label { font-size: 15px; z-index: 2; position: relative; }
+      
+      .day-indicator {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 6px;
+        height: 6px;
+        background: var(--tcm-accent-color);
+        border-radius: 50%;
+        box-shadow: 0 0 5px var(--tcm-accent-color);
       }
-    }
-
-    .acupoint-section, .tea-section {
-      padding: 16px;
-      background: #f0f9ff;
-      border-radius: 8px;
-      margin-bottom: 12px;
-
-      p { margin: 6px 0 8px; font-size: 14px; color: #333; line-height: 1.7; }
-    }
-
-    .section-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-
-    .checklist-section {
-      margin-top: 16px;
-      padding: 16px;
-      background: #fafffe;
-      border-radius: 8px;
-      border: 1px solid #d9f7be;
-
-      .section-title { margin-bottom: 12px; }
-
-      .checklist {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        margin-bottom: 16px;
-
-        .checklist-item {
-          display: flex;
-          align-items: center;
-          padding: 12px 16px;
-          background: #fff;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-          border: 2px solid #e8eaf0;
-          font-size: 14px;
-          color: #333;
-
-          &:hover {
-            border-color: #52c41a;
-            background: #f6ffed;
-          }
-
-          &.checked {
-            background: #f6ffed;
-            border-color: #52c41a;
-            color: #52c41a;
-          }
-        }
-      }
-
-      .checkin-btn { width: 100%; }
+      &.active .day-indicator { background: var(--tcm-bg-color); box-shadow: 0 0 5px var(--tcm-bg-color); }
     }
   }
 }
 
-/* ─── Weekly notes ─────────────────────────────────── */
-.weekly-notes-card {
-  border-radius: 12px;
-  border: 1px solid #ddebe1;
+.day-detail {
+  .detail-masonry {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
 
+    .masonry-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 20px;
+      background: var(--tcm-page-bg);
+      border-radius: 20px;
+      border: 1px solid var(--tcm-border-color);
+      transition: all 0.3s;
+
+      &:hover { transform: translateY(-4px); background: var(--tcm-border-color); }
+
+      .detail-icon { font-size: 28px; flex-shrink: 0; filter: drop-shadow(0 0 10px var(--tcm-shadow)); }
+      .detail-label { font-size: 13px; color: var(--tcm-text-regular); margin-bottom: 6px; font-weight: 600; }
+      .detail-value { font-size: 15px; color: var(--tcm-text-primary); line-height: 1.5; font-weight: 500; }
+    }
+  }
+
+  .extra-cares-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+
+    .care-tile {
+      padding: 24px;
+      background: var(--tcm-page-bg);
+      border-radius: 24px;
+      border: 1px solid var(--tcm-border-color);
+
+      .section-title { font-size: 16px; font-weight: 700; color: var(--tcm-text-primary); margin-bottom: 12px; }
+      p { font-size: 15px; color: var(--tcm-text-regular); line-height: 1.6; margin: 0 0 16px; }
+
+      .bento-warning-alert {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(245, 158, 11, 0.1);
+        color: #fbbf24;
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        border: 1px solid rgba(245, 158, 11, 0.2);
+      }
+    }
+  }
+}
+
+/* ─── Side Col (Checklist & Notes) ─────────────────── */
+.side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.checklist-tile {
+  background: linear-gradient(135deg, var(--tcm-card-bg), color-mix(in srgb, var(--tcm-accent-color) 5%, transparent));
+  flex: 1;
+
+  .section-title { font-size: 20px; font-weight: 700; color: var(--tcm-text-primary); margin-bottom: 24px; }
+
+  .checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 20px;
+      background: var(--tcm-page-bg);
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 1px solid var(--tcm-border-color);
+
+      &:hover { background: var(--tcm-border-color); transform: translateX(4px); }
+
+      .check-circle {
+        width: 24px; height: 24px; border-radius: 50%;
+        border: 2px solid var(--tcm-border-color);
+        display: flex; align-items: center; justify-content: center;
+        transition: all 0.3s;
+      }
+      .check-text { font-size: 15px; color: var(--tcm-text-primary); font-weight: 500; transition: all 0.3s; }
+
+      &.checked {
+        background: color-mix(in srgb, var(--tcm-accent-color) 15%, transparent);
+        border-color: color-mix(in srgb, var(--tcm-accent-color) 30%, transparent);
+        .check-circle {
+          background: var(--tcm-accent-color); border-color: var(--tcm-accent-color);
+          &::after { content: ''; width: 6px; height: 10px; border: solid var(--tcm-bg-color); border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-2px); }
+        }
+        .check-text { color: var(--tcm-accent-color); text-decoration: line-through; opacity: 0.8; }
+      }
+    }
+  }
+
+  .checkin-btn {
+    width: 100%; height: 56px; border-radius: 20px; font-size: 16px; font-weight: 600;
+    background: var(--tcm-page-bg); border: 1px solid var(--tcm-border-color); color: var(--tcm-text-primary);
+    &:hover { background: var(--tcm-border-color); }
+    &.btn-completed { background: var(--tcm-accent-color); border-color: var(--tcm-accent-color); color: var(--tcm-bg-color); box-shadow: 0 10px 25px var(--tcm-shadow); }
+  }
+}
+
+.weekly-notes-tile {
   .weekly-notes-text {
-    font-size: 14px;
-    color: #333;
-    line-height: 1.8;
-    margin-bottom: 16px;
+    font-size: 15px; color: var(--tcm-text-regular); line-height: 1.6; margin: 0 0 20px;
+    padding: 20px; background: var(--tcm-page-bg); border-radius: 20px;
+  }
+  .bento-info-alert {
+    font-size: 13px; color: var(--tcm-text-regular); padding: 12px 16px;
+    background: var(--tcm-page-bg); border-radius: 12px; border-left: 3px solid var(--tcm-text-regular);
   }
 }
 
 /* ─── Empty state ──────────────────────────────────── */
-.empty-state {
-  .empty-illustration { font-size: 72px; text-align: center; }
-
-  .constitution-intro {
-    margin-top: 24px;
-    border-radius: 12px;
-
-    .constitution-card {
-      padding: 16px;
-      border-radius: 12px;
-      border: 1px solid $border-color;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-bottom: 12px;
-
-      &:hover {
-        border-color: $primary;
-        box-shadow: 0 4px 12px rgba(22, 119, 255, 0.1);
-        transform: translateY(-2px);
-      }
-
-      .const-emoji { font-size: 28px; margin-bottom: 6px; }
-      .const-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-      .const-desc { font-size: 11px; color: #888; }
-    }
-  }
+.empty-bento {
+  padding: 60px 0;
+  display: flex; justify-content: center; align-items: center; text-align: center;
+  
+  .empty-illustration { font-size: 80px; margin-bottom: 24px; filter: drop-shadow(0 10px 20px var(--tcm-shadow)); }
+  h3 { font-size: 24px; color: var(--tcm-text-primary); margin: 0 0 12px; }
+  p { font-size: 16px; color: var(--tcm-text-regular); margin: 0 0 32px; }
+  .generate-btn { font-size: 16px; padding: 12px 32px; height: auto; }
 }
 
-/* ─── Report option ──────────────────────────────────── */
-.report-option {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-
-  .report-syndrome {
-    font-size: 13px;
-    font-weight: 600;
-    color: #333;
-  }
-
-  .report-complaint {
-    font-size: 12px;
-    color: #888;
-  }
+/* ─── Asymmetrical Bento Grid ──────────────────────────────────── */
+.constitution-intro-section {
+  .section-heading { font-size: 24px; color: var(--tcm-text-primary); margin: 40px 0 24px; font-weight: 700; text-align: center; }
 }
 
-.form-tip {
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
-}
+.asymmetrical-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-auto-rows: 200px;
+  gap: 20px;
 
-/* ─── Summary right ──────────────────────────────────── */
-.summary-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-
-  .summary-theme {
-    text-align: right;
-
-    .theme-label { font-size: 12px; color: #888; margin-bottom: 4px; }
-    .theme-text { font-size: 16px; font-weight: 600; color: $primary; }
-  }
-}
-
-/* ─── Principles editor ──────────────────────────────── */
-.principles-editor {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-/* ─── 推荐体质提示 ──────────────────────────────── */
-.recommend-tip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 12px;
-  color: #1677ff;
-  background: #f0f7ff;
-  padding: 8px 12px;
-  border-radius: 6px;
-
-  .recommend-tag {
+  .constitution-tile {
+    background: var(--tcm-card-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--tcm-border-color);
+    border-radius: 32px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
     cursor: pointer;
-    margin-left: 4px;
-    
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(circle at top right, var(--tcm-border-color), transparent 70%);
+      opacity: 0; transition: opacity 0.4s;
+    }
+
     &:hover {
-      opacity: 0.8;
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: 0 20px 40px var(--tcm-shadow);
+      border-color: var(--tcm-border-color);
+      &::before { opacity: 1; }
+      .action-icon { background: var(--tcm-text-primary); color: var(--tcm-bg-color); transform: translateX(4px); }
+    }
+
+    .tile-top {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      .const-emoji { font-size: 40px; filter: drop-shadow(0 4px 8px var(--tcm-shadow)); }
+      .action-icon {
+        width: 36px; height: 36px; border-radius: 50%; background: var(--tcm-page-bg);
+        display: flex; align-items: center; justify-content: center; color: var(--tcm-text-primary);
+        transition: all 0.3s;
+      }
+    }
+
+    .tile-bottom {
+      .const-name { font-size: 20px; font-weight: 700; color: var(--tcm-text-primary); margin-bottom: 8px; }
+      .const-desc { font-size: 14px; color: var(--tcm-text-regular); line-height: 1.5; }
     }
   }
+
+  /* 非对称跨列 */
+  .constitution-tile:nth-child(1) { grid-column: span 2; grid-row: span 1; background: linear-gradient(135deg, color-mix(in srgb, var(--tcm-accent-color) 15%, transparent), var(--tcm-card-bg)); }
+  .constitution-tile:nth-child(4) { grid-row: span 2; }
+  .constitution-tile:nth-child(7) { grid-column: span 2; }
+  
+  @media (max-width: 768px) {
+    .constitution-tile { grid-column: span 1 !important; grid-row: span 1 !important; }
+  }
+}
+
+/* ─── Modal/Dialog Overrides ──────────────────────────────────── */
+:deep(.glass-dialog) {
+  background: var(--tcm-card-bg) !important;
+  backdrop-filter: blur(40px);
+  border: 1px solid var(--tcm-border-color);
+  border-radius: 32px;
+  box-shadow: 0 40px 80px var(--tcm-shadow) !important;
+  
+  .el-dialog__title { color: var(--tcm-text-primary); font-weight: 700; font-size: 20px; }
+  .el-form-item__label { color: var(--tcm-text-regular); font-weight: 600; }
+  
+  .el-input__wrapper, .el-textarea__inner { background: var(--tcm-page-bg); box-shadow: 0 0 0 1px var(--tcm-border-color) inset; color: var(--tcm-text-primary); }
+  .el-input__wrapper:hover, .el-input__wrapper.is-focus { box-shadow: 0 0 0 1px var(--tcm-accent-color) inset; }
+}
+
+.report-option {
+  display: flex; flex-direction: column; gap: 6px; padding: 8px 0;
+  .report-syndrome { font-size: 15px; font-weight: 700; color: var(--tcm-accent-color); }
+  .report-complaint { font-size: 13px; color: var(--tcm-text-regular); }
+}
+.form-tip { font-size: 13px; color: var(--tcm-text-regular); margin-top: 8px; }
+
+@media (max-width: 1024px) {
+  .summary-right { flex-direction: column; align-items: flex-end; gap: 16px !important; }
 }
 </style>

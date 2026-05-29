@@ -2,8 +2,11 @@
 """
 模型提供商管理器，用于注册和管理所有模型提供商
 """
+import logging
 from typing import Dict, List
 from apps.model_provider.base_model_provider import IModelProvider
+
+logger = logging.getLogger('apps.model_provider')
 
 
 class ProviderManager:
@@ -24,7 +27,7 @@ class ProviderManager:
         provider = self.provider_dict.get(provider_key)
         # 如果提供商不存在，重新注册所有提供商
         if not provider:
-            print(f"提供商 {provider_key} 不存在，正在重新注册所有提供商...")
+            logger.info("Provider %s is missing; registering built-in providers again", provider_key)
             # 清除现有提供商
             self.provider_dict.clear()
             self.provider_list.clear()
@@ -94,9 +97,9 @@ def register_builtin_providers():
             provider_class = getattr(module, provider_class_name)
             provider_instance = provider_class()
             global_provider_manager.register_provider(provider_instance)
-            print(f"成功注册模型提供商: {provider_class_name}")
+            logger.debug("Registered model provider: %s", provider_class_name)
         except Exception as e:
-            print(f"注册模型提供商失败 {provider_class_name}: {str(e)}")
+            logger.warning("Failed to register model provider %s: %s", provider_class_name, e)
             continue
     
 

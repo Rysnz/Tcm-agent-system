@@ -168,6 +168,10 @@ class SessionState(BaseModel):
     trace_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    first_user_message_at: Optional[datetime] = Field(
+        default=None,
+        description="用户第一次实际发送问诊消息的时间",
+    )
 
     # 流程阶段
     current_stage: ConsultStage = Field(default=ConsultStage.INTAKE)
@@ -234,8 +238,11 @@ class SessionState(BaseModel):
 
     def add_message(self, role: str, content: str) -> None:
         """添加对话消息"""
+        now = datetime.utcnow()
         self.messages.append({"role": role, "content": content})
-        self.updated_at = datetime.utcnow()
+        if role == "user" and self.first_user_message_at is None:
+            self.first_user_message_at = now
+        self.updated_at = now
 
     def add_reference_chunk(self, chunk: ReferenceChunk) -> None:
         """添加 RAG 参考片段（去重）"""
