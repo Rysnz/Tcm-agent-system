@@ -12,7 +12,6 @@
     <header class="glass-nav">
       <div class="nav-logo">
         <div class="logo-mark"></div>
-        <span>TCM AI Horizon</span>
       </div>
       <div class="nav-actions">
         <button class="btn-ghost" @click="router.push('/wellness')">养生档案</button>
@@ -28,7 +27,7 @@
           <span>Next-Gen TCM Agent Architecture</span>
         </div>
         <h1 class="hero-title">
-          中医智能<br />
+          杏林语康<br />
           <span class="gradient-text">多体问诊引擎</span>
         </h1>
         <p class="hero-subtitle">
