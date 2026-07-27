@@ -156,7 +156,7 @@ docker exec tcm-backend python manage.py migrate
 # 1. 安装后端依赖（Python 3.11+）
 python -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
 # 2. 配置环境变量
 cp .env.example .env

@@ -60,7 +60,7 @@ services:
         condition: service_healthy
     volumes:
       - ./apps:/app/apps
-      - media_data:/app/media
+      - media_data:/app/apps/media
     restart: unless-stopped
     command: >
       sh -c "python manage.py migrate &&

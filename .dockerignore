@@ -1,0 +1,75 @@
+# =============================================================================
+# Docker 构建忽略规则
+# 防止本地开发文件、敏感配置、大文件被复制到 Docker 镜像中
+# =============================================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.installed.cfg
+.Python
+
+# --- 虚拟环境（本地几百 MB，容器会重新安装）---
+venv/
+.venv/
+env/
+.env/
+
+# --- 敏感配置 ---
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# --- 日志和数据库 ---
+*.log
+db.sqlite3
+*.sqlite3
+
+# --- 模型文件（大文件，Docker 中启动时下载）---
+models/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- 前端 node_modules ---
+ui/node_modules/
+ui/dist/
+
+# --- Git ---
+.git/
+.gitignore
+.gitattributes
+
+# --- 本地素材/文档（非项目代码）---
+docs/
+视频准备材料/
+backup/
+*.pdf
+
+# --- OS 文件 ---
+.DS_Store
+Thumbs.db
+
+# --- 本地测试脚本（非项目核心代码）---
+test_*.py
+patch_style.py
+read_pdf.py
+replace_styles.py
+check_*.py
+debug_*.py
+
+# --- Docker 自身（不需要在构建上下文中）---
+.dockerignore
